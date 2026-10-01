@@ -1,0 +1,36 @@
+# Production Readiness
+
+This is an evidence-based baseline for the repository as inspected. `READY` means verified for the named scope, not a claim of legal or operational launch approval. A controlled pilot is **not approved** until blockers are closed and acceptance tests pass.
+
+| Area | Status | Implementation | Remaining work | Testing status | Notes |
+|---|---|---|---|---|---|
+| Authentication | BLOCKED | Fixed OTP and demo identities; production demo APIs fail closed. | Integrate OTP provider, expiry/attempt limits, secure sessions, refresh, logout, recovery, deletion, suspension. | Build only; no auth tests. | Do not accept real users. |
+| Authorization | BLOCKED | No verified session/role middleware or server-side role checks. | Enforce passenger/captain/admin/support permissions in every handler. | Not tested. | UI hiding is not authorization. |
+| Database | BLOCKED | Types and setup notes only. | Migrations, constraints, transactions, backups, indexes, database adapter. | Not tested. | No schema found. |
+| Realtime | BLOCKED | No production subscription/recovery path found. | Reconnect, resubscribe, deduplicate and fetch authoritative state after reconnect. | Not tested. | No Supabase Realtime configured. |
+| Maps | BLOCKED | Provider placeholders only. | Provider integration, key restrictions, routing errors and address validation. | Not tested. | No route provider configured. |
+| Location tracking | BLOCKED | Fixture coordinates in matching data. | Permission/background strategy, validation, throttling, timestamp and jump checks. | Not tested on devices. | No live location backend. |
+| Payments | BLOCKED | In-memory fixture; production API now fails closed. | Server-created Razorpay orders, signature/webhook verification, idempotency, refunds and reconciliation. | Not tested. | Never use production credentials in staging. |
+| Captain verification | BLOCKED | Types and eligibility scaffolding only. | Private storage, signed URLs, review workflow, audit events and eligibility policy review. | Not tested. | No document storage configured. |
+| Notifications | BLOCKED | Types/service placeholders only. | In-app/push/email adapters, preferences, retries and templates. | Not tested. | No provider configured. |
+| Safety | BLOCKED | Safety event type/scaffolding only. | Persist SOS/report events, authorized escalation, ownership and audited drills. | Not tested. | Do not claim emergency calls are placed. |
+| Admin | BLOCKED | Fixture dashboard hidden outside demo mode. | Real admin auth, role enforcement, audit logs, confirmation and least-privilege queries. | Not tested. | Production route is unavailable, not secured for use. |
+| Rate limiting / idempotency | BLOCKED | No shared rate limiter or persistent idempotency store. | Add distributed limits and database constraints for sensitive actions. | Not tested. | Process-local throttles are not production controls. |
+| File upload security | BLOCKED | No upload/storage implementation found. | Validate content/size, use private buckets, signed URLs, and malware/image checks where appropriate. | Not tested. | Never expose KYC files publicly. |
+| Offline recovery | BLOCKED | No authoritative reconnect/resync implementation found. | Show connection state and refetch backend state after reconnect/background resume. | Not tested. | Local UI state must not authorize a ride transition. |
+| Feature flags / business settings | IN_PROGRESS | Server environment flags are defined and default off. | Enforce flags server-side and persist/administer fare, service-area, cancellation, commission, and safety settings. | Build only. | Environment flags are not an admin settings system. |
+| Accessibility | NOT_STARTED | No accessibility audit evidence found. | Test keyboard, screen reader, contrast, touch target and error announcement behavior. | Not tested. | Include assistive-technology device checks. |
+| Analytics | NOT_STARTED | No privacy-reviewed analytics adapter found. | Add event abstraction with minimization, consent, retention, and opt-out where required. | Not tested. | Do not send precise location or sensitive documents. |
+| Security | IN_PROGRESS | Production defaults to non-demo; environment templates separate public and server variables. | Threat model, headers/CSRF, rate limits, dependency review, secret rotation and penetration testing. | Production build passes. | Provider credentials and identity integration absent. |
+| Performance | NOT_STARTED | No production performance instrumentation or benchmarks found. | Bundle/API/DB/location budgets, load tests, caching and query optimization. | Not tested. | Define pilot SLOs. |
+| Error handling | IN_PROGRESS | API result envelope exists; unavailable production operations return 503. | Central taxonomy, validation, safe logs, request IDs, retries and user recovery states. | Build passes; behavior tests absent. | Never expose provider/database details. |
+| Monitoring | NOT_STARTED | No monitoring provider integration found. | Error reporting, structured logs, alerts, dashboards and on-call process. | Not tested. | Exclude OTPs, credentials, tokens and documents from logs. |
+| Testing | BLOCKED | Vitest unit and demo-service lifecycle tests cover mode separation, fare, transition rules, fare tampering, PIN gating, and duplicate completion. | Add auth/RLS/API/provider integration, browser E2E, chaos, performance, device suites and CI gates. | 31 tests and production build pass; full lint has existing errors. | See `docs/TESTING.md`; two-device flow is not tested. |
+| Deployment | BLOCKED | Deployment notes and environment examples exist. | Separate staging/prod infrastructure, migrations, secrets, SSL, rollback and smoke tests. | Build passes locally. | No staging target verified. |
+| Backup/recovery | NOT_STARTED | No operational backup evidence found. | Configure DB/storage backups; test restoration, RPO/RTO and migration rollback. | Not tested. | See `docs/BACKUP_AND_RECOVERY.md`. |
+| Privacy | BLOCKED | No reviewed policies or retention implementation found. | Minimize data, retention/deletion/export, consent, processor review and approved text. | Not tested. | Legal review required. |
+| Legal/compliance | BLOCKED | Non-binding policy placeholders exist under `/legal`. | Qualified review and approved policy text for transport, insurance, GST, payments, privacy, KYC and eligibility. | Not tested. | Placeholders are not policies; code does not satisfy legal obligations. |
+
+## Controlled pilot gate
+
+Do not enable production bookings or payments until relevant `BLOCKED` areas are closed, staging credentials and infrastructure are isolated, security and recovery tests pass, and the two-device flow in `docs/TESTING.md` is recorded with build/version, devices, timestamps, and outcome. Real-device and legal/compliance sign-off remain outstanding.
