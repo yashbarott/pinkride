@@ -1,14 +1,14 @@
-# PinkRide Stage 3
+# PinkRide
 
-PinkRide is a women-only mobility platform with a passenger app, captain app, and production-ready architecture scaffolding for the next phase of the product.
+PinkRide is a passenger and captain ride-booking prototype. The Stage 4 audit found that its API services are demo fixtures, not production integrations. Do not use it for real bookings, credentials, or payments.
 
 ## Current status
 
-This project keeps the Stage 1 and Stage 2 demo UI intact while introducing a production-oriented backend foundation for:
+This project keeps the existing demo UI and includes scaffolding for:
 
 - real authentication abstractions
 - database-ready models
-- server-side ride states
+- ride state types and in-memory demo ride state
 - matching and eligibility services
 - API routes for auth, rides, and payments
 - admin dashboard foundation
@@ -36,6 +36,7 @@ Copy `.env.example` to `.env.local` and fill in values when you connect Supabase
 npm install
 npm run dev
 npm run build
+npm test
 ```
 
 ## API routes introduced
@@ -50,4 +51,14 @@ npm run build
 
 ## Important note
 
-The frontend continues to render the demo UI, while the server-side service layer acts as the authoritative boundary for production-ready business logic. This keeps the demo behavior stable while preparing the app for real auth, payments, maps, and monitoring integration.
+Production mode fails closed with HTTP 503 for API operations that do not have real provider-backed implementations. The current ride state is process-local, OTP is a fixed demo flow, payment verification is a fixture, and database/RLS, realtime, live location, and admin authorization are not implemented. See [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) before considering any pilot.
+
+## Documentation
+
+- [Architecture audit](docs/ARCHITECTURE.md)
+- [Production readiness](docs/PRODUCTION_READINESS.md)
+- [Database security](docs/DATABASE_SECURITY.md)
+- [Payment flow](docs/PAYMENT_FLOW.md)
+- [Testing and device checklist](docs/TESTING.md)
+- [Backup and recovery](docs/BACKUP_AND_RECOVERY.md)
+- [Deployment checklist](docs/DEPLOYMENT.md)

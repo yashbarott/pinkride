@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { getDemoModeUnavailableResponse } from "@/lib/demo-api";
 import { createRide } from "@/services/rideService";
 
 export async function POST(request: Request) {
+  const unavailable = getDemoModeUnavailableResponse();
+  if (unavailable) return unavailable;
+
   const body = await request.json().catch(() => ({}));
   const result = await createRide(String(body.passengerId ?? "user_passenger_priya"), body);
 
@@ -12,6 +16,9 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
+  const unavailable = getDemoModeUnavailableResponse();
+  if (unavailable) return unavailable;
+
   return NextResponse.json({
     success: true,
     data: {

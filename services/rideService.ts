@@ -1,5 +1,7 @@
 import { createErrorResponse, createSuccessResponse } from "@/lib/config";
 import { evaluatePassengerEligibility } from "@/lib/eligibility";
+import { calculateFare } from "@/lib/fare";
+import { canTransitionRide } from "@/lib/ride-rules";
 import { findAvailableCaptain } from "@/services/matchingService";
 import type { ApiResponse, Ride, RideStatus } from "@/types";
 
@@ -14,20 +16,7 @@ const DEFAULT_ROUTE = {
   destinationAddress: "Vesu, Surat",
 };
 
-export function calculateFare(distanceKm = 6.4, durationMinutes = 18) {
-  const baseFare = 30;
-  const distanceCharge = distanceKm * 6.5;
-  const timeCharge = durationMinutes * 1.2;
-  const platformFee = 6;
-  const total = baseFare + distanceCharge + timeCharge + platformFee;
-
-  return {
-    estimatedFare: Number(total.toFixed(2)),
-    captainEarnings: Number((total * 0.88).toFixed(2)),
-    distanceKm,
-    durationMinutes,
-  };
-}
+export { calculateFare } from "@/lib/fare";
 
 export async function createRide(passengerId: string, override?: Partial<Ride>): Promise<ApiResponse<{ ride: Ride; captainId: string }>> {
   const passengerEligibility = evaluatePassengerEligibility({ role: "passenger", status: "active" });
@@ -49,12 +38,12 @@ export async function createRide(passengerId: string, override?: Partial<Ride>):
     destinationLat: override?.destinationLat ?? DEFAULT_ROUTE.destinationLat,
     destinationLng: override?.destinationLng ?? DEFAULT_ROUTE.destinationLng,
     destinationAddress: override?.destinationAddress ?? DEFAULT_ROUTE.destinationAddress,
-    distanceKm: override?.distanceKm ?? fare.distanceKm,
-    estimatedDurationMinutes: override?.estimatedDurationMinutes ?? fare.durationMinutes,
-    estimatedFare: override?.estimatedFare ?? fare.estimatedFare,
-    finalFare: override?.finalFare ?? fare.estimatedFare,
-    captainEarnings: override?.captainEarnings ?? fare.captainEarnings,
-    status: override?.status ?? "searching_captain",
+    distanceKm: fare.distanceKm,
+    estimatedDurationMinutes: fare.durationMinutes,
+    estimatedFare: fare.estimatedFare,
+    finalFare: fare.estimatedFare,
+    captainEarnings: fare.captainEarnings,
+    status: "searching_captain",
     paymentStatus: "pending",
     createdAt: new Date().toISOString(),
   };
@@ -69,6 +58,14 @@ export async function updateRideStatus(rideId: string, status: RideStatus): Prom
 
   if (!ride) {
     return createErrorResponse("RIDE_NOT_FOUND", "Ride not found.");
+  }
+
+  if (ride.status === status) {
+    return createSuccessResponse({ ride });
+  }
+
+  if (!canTransitionRide(ride.status, status)) {
+    return createErrorResponse("RIDE_INVALID_STATE", `Cannot transition ride from ${ride.status} to ${status}.`);
   }
 
   ride.status = status;
@@ -90,6 +87,10 @@ export async function verifyRidePin(rideId: string, pin: string): Promise<ApiRes
 
   if (!ride) {
     return createErrorResponse("RIDE_NOT_FOUND", "Ride not found.");
+  }
+
+  if (ride.status !== "awaiting_pin") {
+    return createErrorResponse("RIDE_INVALID_STATE", "Ride is not awaiting a start PIN.");
   }
 
   const valid = pin === "4821";

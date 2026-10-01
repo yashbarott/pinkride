@@ -297,47 +297,26 @@ function PinkRideStage2() {
     }
   }, [captainStep]);
 
-  useEffect(() => {
-    if (ride.status === "searching_captain" && role === "passenger") {
-      setPassengerStep("finding");
-    }
-    if (ride.status === "captain_assigned" && role === "passenger") {
-      setPassengerStep("captain-assigned");
-    }
-    if (ride.status === "captain_arrived" && role === "passenger") {
-      setPassengerStep("captain-arrived");
-    }
-    if (ride.status === "ride_started" && role === "passenger") {
-      setPassengerStep("ride-active");
-    }
-    if (ride.status === "ride_completed" && role === "passenger") {
-      setPassengerStep("ride-complete");
-    }
-    if (ride.status === "payment_completed" && role === "passenger") {
-      setPassengerStep("rating");
-    }
-  }, [ride.status, role]);
-
-  useEffect(() => {
-    if (ride.status === "captain_requested" && role === "captain") {
-      setCaptainStep("request");
-    }
-    if (ride.status === "captain_assigned" && role === "captain") {
-      setCaptainStep("navigate");
-    }
-    if (ride.status === "captain_arrived" && role === "captain") {
-      setCaptainStep("arrived");
-    }
-    if (ride.status === "awaiting_pin" && role === "captain") {
-      setCaptainStep("pin");
-    }
-    if (ride.status === "ride_started" && role === "captain") {
-      setCaptainStep("active");
-    }
-    if (ride.status === "ride_completed" && role === "captain") {
-      setCaptainStep("earnings");
-    }
-  }, [ride.status, role]);
+  const passengerRideSteps: Partial<Record<RideStatus, PassengerStep>> = {
+    searching_captain: "finding",
+    captain_assigned: "captain-assigned",
+    captain_arrived: "captain-arrived",
+    ride_started: "ride-active",
+    ride_completed: "ride-complete",
+    payment_completed: "rating",
+  };
+  const captainRideSteps: Partial<Record<RideStatus, typeof captainStep>> = {
+    captain_requested: "request",
+    captain_assigned: "navigate",
+    captain_arrived: "arrived",
+    awaiting_pin: "pin",
+    ride_started: "active",
+    ride_completed: "earnings",
+  };
+  const currentPassengerStep =
+    role === "passenger" ? passengerRideSteps[ride.status] ?? passengerStep : passengerStep;
+  const currentCaptainStep =
+    role === "captain" ? captainRideSteps[ride.status] ?? captainStep : captainStep;
 
   useEffect(() => {
     if (otp.length === 4 && otp === "4821") {
@@ -413,7 +392,7 @@ function PinkRideStage2() {
   };
 
   const renderPassengerFlow = () => {
-    if (passengerStep === "splash") {
+    if (currentPassengerStep === "splash") {
       return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex min-h-screen items-center justify-center bg-[#fffafc]">
           <div className="flex flex-col items-center justify-center gap-5 text-center">
@@ -428,7 +407,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "onboarding") {
+    if (currentPassengerStep === "onboarding") {
       return (
         <div className="mx-auto flex min-h-screen max-w-md flex-col bg-[#fffafc] px-5 pb-8 pt-6">
           <div className="mb-6 flex items-center justify-between">
@@ -462,7 +441,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "login") {
+    if (currentPassengerStep === "login") {
       return (
         <div className="mx-auto flex min-h-screen max-w-md flex-col bg-[#fffafd] px-5 pb-8 pt-8">
           <div className="mb-8 flex items-center justify-center">
@@ -485,7 +464,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "otp") {
+    if (currentPassengerStep === "otp") {
       return (
         <div className="mx-auto flex min-h-screen max-w-md flex-col bg-[#fffafc] px-5 pb-8 pt-8">
           <button onClick={() => setPassengerStep("login")} className="mb-5 flex items-center gap-2 text-sm font-medium text-[#4a464b]">
@@ -504,7 +483,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "profile") {
+    if (currentPassengerStep === "profile") {
       return (
         <div className="mx-auto flex min-h-screen max-w-md flex-col bg-[#fffafc] px-5 pb-8 pt-8">
           <div className="mb-8 text-center">
@@ -536,7 +515,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "permissions") {
+    if (currentPassengerStep === "permissions") {
       return (
         <div className="mx-auto flex min-h-screen max-w-md flex-col bg-[#fffafc] px-5 pb-8 pt-8">
           <div className="mb-8 text-center">
@@ -569,7 +548,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "home") {
+    if (currentPassengerStep === "home") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] pb-24 pt-6">
           <header className="mb-4 flex items-center justify-between px-4">
@@ -612,7 +591,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "search") {
+    if (currentPassengerStep === "search") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-5">
           <div className="mb-5 flex items-center gap-3">
@@ -633,7 +612,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "pickup") {
+    if (currentPassengerStep === "pickup") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
           <div className="h-[480px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_40px_rgba(26,17,22,0.08)]">
@@ -649,7 +628,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "ride-options") {
+    if (currentPassengerStep === "ride-options") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
           <div className="mb-4 h-[280px] overflow-hidden rounded-[28px] border border-[#f1dfe8] bg-white p-2 shadow-sm"><MapView mode="route" routeProgress={50} /></div>
@@ -677,7 +656,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "fare") {
+    if (currentPassengerStep === "fare") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-8">
           <div className="rounded-[30px] border border-[#f1dfe8] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
@@ -702,7 +681,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "confirm-booking") {
+    if (currentPassengerStep === "confirm-booking") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-10">
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
@@ -723,7 +702,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "finding") {
+    if (currentPassengerStep === "finding") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pt-3">
           <div className="h-[560px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]">
@@ -738,7 +717,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "captain-assigned") {
+    if (currentPassengerStep === "captain-assigned") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
           <div className="h-[420px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" routeProgress={66} /></div>
@@ -762,7 +741,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "captain-arrived") {
+    if (currentPassengerStep === "captain-arrived") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-8">
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
@@ -781,7 +760,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "ride-pin") {
+    if (currentPassengerStep === "ride-pin") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-8">
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
@@ -795,7 +774,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "ride-active") {
+    if (currentPassengerStep === "ride-active") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
           <div className="h-[520px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" routeProgress={84} /></div>
@@ -815,7 +794,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "safety") {
+    if (currentPassengerStep === "safety") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-8">
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
@@ -841,7 +820,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "share") {
+    if (currentPassengerStep === "share") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-8">
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
@@ -863,7 +842,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "ride-complete") {
+    if (currentPassengerStep === "ride-complete") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-8">
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)] text-center">
@@ -881,7 +860,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "payment") {
+    if (currentPassengerStep === "payment") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-8">
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
@@ -900,7 +879,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "rating") {
+    if (currentPassengerStep === "rating") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-8">
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
@@ -922,7 +901,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (passengerStep === "history") {
+    if (currentPassengerStep === "history") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-8">
           <div className="mb-5 flex items-center justify-between"><h2 className="text-[28px] font-bold tracking-[-0.06em] text-[#201d20]">My Rides</h2></div>
@@ -945,7 +924,7 @@ function PinkRideStage2() {
   };
 
   const renderCaptainFlow = () => {
-    if (captainStep === "splash") {
+    if (currentCaptainStep === "splash") {
       return (
         <div className="flex min-h-screen items-center justify-center bg-[#fffafc]">
           <div className="flex flex-col items-center justify-center gap-5 text-center">
@@ -958,7 +937,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (captainStep === "login") {
+    if (currentCaptainStep === "login") {
       return (
         <div className="mx-auto flex min-h-screen max-w-md flex-col bg-[#fffafc] px-5 pb-8 pt-8">
           <div className="mb-8 text-center">
@@ -977,7 +956,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (captainStep === "otp") {
+    if (currentCaptainStep === "otp") {
       return (
         <div className="mx-auto flex min-h-screen max-w-md flex-col bg-[#fffafc] px-5 pb-8 pt-8">
           <button onClick={() => setCaptainStep("login")} className="mb-5 flex items-center gap-2 text-sm font-medium text-[#4a464b]"><ArrowLeft className="h-4 w-4" /> Back</button>
@@ -994,7 +973,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (captainStep === "onboarding") {
+    if (currentCaptainStep === "onboarding") {
       return (
         <div className="mx-auto flex min-h-screen max-w-md flex-col bg-[#fffafc] px-5 pb-8 pt-8">
           <div className="mb-8 text-center">
@@ -1014,7 +993,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (captainStep === "home") {
+    if (currentCaptainStep === "home") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] pb-24 pt-6">
           <CaptainHeader title="Good morning, Ananya" subtitle="Verified Pink Captain" />
@@ -1050,7 +1029,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (captainStep === "request") {
+    if (currentCaptainStep === "request") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
           <div className="h-[430px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="finding" routeProgress={55} /></div>
@@ -1072,7 +1051,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (captainStep === "navigate") {
+    if (currentCaptainStep === "navigate") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
           <div className="h-[440px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" routeProgress={72} /></div>
@@ -1089,7 +1068,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (captainStep === "arrived") {
+    if (currentCaptainStep === "arrived") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-8">
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
@@ -1105,7 +1084,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (captainStep === "pin") {
+    if (currentCaptainStep === "pin") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-8">
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
@@ -1119,7 +1098,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (captainStep === "active") {
+    if (currentCaptainStep === "active") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
           <div className="h-[520px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" routeProgress={86} /></div>
@@ -1137,7 +1116,7 @@ function PinkRideStage2() {
       );
     }
 
-    if (captainStep === "earnings") {
+    if (currentCaptainStep === "earnings") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-8">
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)] text-center">

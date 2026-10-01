@@ -1,6 +1,11 @@
+import { notFound } from "next/navigation";
+
+import { config } from "@/lib/config";
 import { getAdminDashboard } from "@/services/adminService";
 
 export default async function AdminDashboardPage() {
+  if (!config.demoMode) notFound();
+
   const result = await getAdminDashboard();
   const stats = result.success ? result.data.stats : {};
 
