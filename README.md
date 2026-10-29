@@ -24,7 +24,7 @@ This project keeps the existing demo UI and includes scaffolding for:
 
 ## Demo mode
 
-Demo mode remains active by default. The app still works without real service credentials and can be switched to production mode through environment config later.
+Demo mode remains active by default. Passenger and captain demo accounts can be created, signed back into, and logged out from the app. Passengers can select Pink Bike, Pink Rickshaw, or Pink 4 Wheeler; the displayed fares, ride requests, maps, identities, and earnings are sample data and do not dispatch real vehicles. Demo payment only advances the sample flow; it does not charge money. SOS, location tracking, driver verification, calls, and chat are not connected. Accounts and completed passenger ride history are saved in the current browser's local storage; they are not shared with other devices or backed by a server database.
 
 ## Environment
 

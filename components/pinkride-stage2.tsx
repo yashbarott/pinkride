@@ -1,84 +1,67 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
+import Link from "next/link";
 import {
-  AlertTriangle,
   ArrowLeft,
   Bell,
   BriefcaseBusiness,
   Check,
   ChevronRight,
-  CircleDollarSign,
-  Copy,
-  CreditCard,
-  Download,
-  Heart,
-  Home,
-  LocateFixed,
+  LogOut,
   MapPin,
-  MessageSquareText,
-  Minus,
-  Navigation,
-  Phone,
-  Plus,
   Search,
-  ShieldCheck,
   ShieldPlus,
   Siren,
   Sparkles,
   Star,
-  UserRound,
-  Wallet,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-const mockUser = {
-  name: "Priya Sharma",
-  phone: "+91 98765 43210",
-  email: "priya.sharma@gmail.com",
-  avatar: "PS",
-};
-
-const mockCaptain = {
-  name: "Ananya Patel",
-  phone: "+91 98765 43210",
-  rating: 4.9,
-  rides: 1248,
-  vehicle: "Honda Activa",
-  plate: "GJ 05 AB 1234",
-  city: "Surat, Gujarat",
-  avatar: "AP",
-};
-
-const passengerSteps = [
-  "splash",
-  "onboarding",
-  "login",
-  "otp",
-  "profile",
-  "permissions",
-  "home",
-  "search",
-  "pickup",
-  "ride-options",
-  "fare",
-  "confirm-booking",
-  "finding",
-  "captain-assigned",
-  "captain-arriving",
-  "captain-arrived",
-  "ride-pin",
-  "ride-active",
-  "safety",
-  "share",
-  "ride-complete",
-  "payment",
-  "rating",
-  "history",
-] as const;
-
-type PassengerStep = (typeof passengerSteps)[number];
+type PassengerStep =
+  | "splash"
+  | "onboarding"
+  | "login"
+  | "otp"
+  | "profile"
+  | "permissions"
+  | "home"
+  | "search"
+  | "pickup"
+  | "ride-options"
+  | "fare"
+  | "confirm-booking"
+  | "finding"
+  | "captain-assigned"
+  | "captain-arriving"
+  | "captain-arrived"
+  | "ride-pin"
+  | "ride-active"
+  | "safety"
+  | "share"
+  | "ride-complete"
+  | "payment"
+  | "rating"
+  | "history";
 type Role = "passenger" | "captain";
+type CaptainStep =
+  | "splash"
+  | "login"
+  | "otp"
+  | "onboarding"
+  | "home"
+  | "request"
+  | "navigate"
+  | "arrived"
+  | "pin"
+  | "active"
+  | "safety"
+  | "earnings"
+  | "profile"
+  | "wallet"
+  | "rides"
+  | "help"
+  | "settings";
 type RideStatus =
   | "idle"
   | "searching_captain"
@@ -95,9 +78,19 @@ type RideStatus =
   | "rated"
   | "cancelled";
 
+type RideVehicleType = "bike" | "rickshaw" | "car";
+
+function getRideVehicleLabel(vehicleType: RideVehicleType) {
+  if (vehicleType === "rickshaw") return "Pink Rickshaw";
+  if (vehicleType === "car") return "Pink 4 Wheeler";
+  return "Pink Bike";
+}
+
 type MockRide = {
   id: string;
+  vehicleType: RideVehicleType;
   passenger: string;
+  passengerPhone?: string;
   captain: string;
   pickup: string;
   destination: string;
@@ -109,12 +102,59 @@ type MockRide = {
   eta: string;
   duration: string;
   paymentMethod: string;
+  createdAt?: string;
+};
+
+type RideHistoryEntry = {
+  id: string;
+  createdAt: string;
+  vehicleType?: RideVehicleType;
+  captain: string;
+  pickup: string;
+  destination: string;
+  fare: number;
+};
+
+function parseRideHistory(value: string | null): RideHistoryEntry[] {
+  if (!value) return [];
+
+  const parsed: unknown = JSON.parse(value);
+  if (!Array.isArray(parsed)) {
+    throw new Error("Ride history must be a list.");
+  }
+
+  return parsed.filter((entry): entry is RideHistoryEntry =>
+    typeof entry === "object"
+    && entry !== null
+    && "id" in entry
+    && typeof entry.id === "string"
+    && "createdAt" in entry
+    && typeof entry.createdAt === "string"
+    && Number.isFinite(Date.parse(entry.createdAt))
+    && "captain" in entry
+    && typeof entry.captain === "string"
+    && "pickup" in entry
+    && typeof entry.pickup === "string"
+    && "destination" in entry
+    && typeof entry.destination === "string"
+    && "fare" in entry
+    && typeof entry.fare === "number"
+    && Number.isFinite(entry.fare),
+  );
+}
+
+type NavigationSnapshot = {
+  role: Role;
+  passengerStep: PassengerStep;
+  captainStep: CaptainStep;
+  ride: MockRide;
 };
 
 const defaultRide: MockRide = {
   id: "PR-28461",
-  passenger: "Priya Sharma",
-  captain: "Ananya Patel",
+  vehicleType: "bike",
+  passenger: "Passenger",
+  captain: "Captain",
   pickup: "Current Location",
   destination: "Vesu, Surat",
   fare: 82,
@@ -129,6 +169,18 @@ const defaultRide: MockRide = {
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
+}
+
+function getInitials(name: string, fallback: string) {
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join("")
+    .toUpperCase();
+  return initials || fallback;
 }
 
 function Button({
@@ -205,7 +257,7 @@ function MapView({
   routeProgress?: number;
 }) {
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-[28px] bg-[#edf2f4]">
+    <div role="img" aria-label="Illustrative map preview. Live GPS is not connected." className="relative h-full w-full overflow-hidden rounded-[28px] bg-[#edf2f4]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.85),transparent_20%),linear-gradient(135deg,#edf0f4,#e8ecef_48%,#dfe7eb)]" />
       <div className="absolute inset-0 opacity-80 [background-image:linear-gradient(rgba(135,150,160,0.3)_1px,transparent_1px),linear-gradient(90deg,rgba(135,150,160,0.3)_1px,transparent_1px)] [background-size:30px_30px]" />
 
@@ -240,22 +292,14 @@ function MapView({
         </motion.div>
       )}
 
-      <div className="absolute bottom-4 left-4 flex gap-2">
-        <button className="flex h-11 w-11 items-center justify-center rounded-full border border-white/60 bg-white/80 shadow-md backdrop-blur-sm">
-          <LocateFixed className="h-4 w-4 text-[#2a2f33]" />
-        </button>
-        <button className="flex h-11 w-11 items-center justify-center rounded-full border border-white/60 bg-white/80 shadow-md backdrop-blur-sm">
-          <Plus className="h-4 w-4 text-[#2a2f33]" />
-        </button>
-        <button className="flex h-11 w-11 items-center justify-center rounded-full border border-white/60 bg-white/80 shadow-md backdrop-blur-sm">
-          <Minus className="h-4 w-4 text-[#2a2f33]" />
-        </button>
+      <div className="absolute left-3 top-3 rounded-full border border-white/70 bg-white/90 px-3 py-1.5 text-xs font-medium text-[#514a50] shadow-sm">
+        Illustrative map · no live GPS
       </div>
     </div>
   );
 }
 
-function CaptainHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+function CaptainHeader({ title, subtitle, name }: { title: string; subtitle?: string; name: string }) {
   return (
     <header className="mb-5 flex items-start justify-between px-4 pt-6">
       <div>
@@ -264,7 +308,7 @@ function CaptainHeader({ title, subtitle }: { title: string; subtitle?: string }
         {subtitle && <p className="mt-1 text-sm text-[#676167]">{subtitle}</p>}
       </div>
       <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_20%,#f7dbe8,#d78aa8_28%,#a6437a_90%)] text-sm font-bold text-white shadow-md">
-        AP
+        {getInitials(name, "CP")}
       </div>
     </header>
   );
@@ -274,14 +318,29 @@ function PinkRideStage2() {
   const [role, setRole] = useState<Role>("passenger");
   const [ride, setRide] = useState<MockRide>(defaultRide);
   const [passengerStep, setPassengerStep] = useState<PassengerStep>("splash");
-  const [captainStep, setCaptainStep] = useState<"splash" | "login" | "otp" | "onboarding" | "home" | "request" | "navigate" | "arrived" | "pin" | "active" | "safety" | "earnings" | "profile" | "wallet" | "rides" | "help" | "settings">("splash");
+  const [captainStep, setCaptainStep] = useState<CaptainStep>("splash");
+  const [phone, setPhone] = useState("");
+  const [passengerName, setPassengerName] = useState("");
+  const [passengerEmail, setPassengerEmail] = useState("");
+  const [captainName, setCaptainName] = useState("");
+  const [captainEmail, setCaptainEmail] = useState("");
+  const [passengerAccountPhone, setPassengerAccountPhone] = useState("");
+  const [passengerRideHistory, setPassengerRideHistory] = useState<RideHistoryEntry[]>([]);
   const [otp, setOtp] = useState("");
   const [captainOtp, setCaptainOtp] = useState("");
   const [passengerRating, setPassengerRating] = useState(0);
-  const [captainRating, setCaptainRating] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const [sosOpen, setSosOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
   const [online, setOnline] = useState(false);
+  const [loggedInRoles, setLoggedInRoles] = useState<Record<Role, boolean>>({
+    passenger: false,
+    captain: false,
+  });
+  const [canGoBack, setCanGoBack] = useState(false);
+  const navigationHistory = useRef<NavigationSnapshot[]>([]);
+  const currentNavigation = useRef<NavigationSnapshot | null>(null);
+  const restoringNavigation = useRef(false);
 
   useEffect(() => {
     if (passengerStep === "splash") {
@@ -316,25 +375,60 @@ function PinkRideStage2() {
   const currentPassengerStep =
     role === "passenger" ? passengerRideSteps[ride.status] ?? passengerStep : passengerStep;
   const currentCaptainStep =
-    role === "captain" ? captainRideSteps[ride.status] ?? captainStep : captainStep;
+    role === "captain"
+      ? ride.status === "ride_completed" && captainStep === "home"
+        ? captainStep
+        : captainRideSteps[ride.status] ?? captainStep
+      : captainStep;
 
   useEffect(() => {
-    if (otp.length === 4 && otp === "4821") {
-      const timer = window.setTimeout(() => {
-        setPassengerStep("profile");
-      }, 250);
-      return () => window.clearTimeout(timer);
-    }
-  }, [otp]);
+    const nextNavigation: NavigationSnapshot = {
+      role,
+      passengerStep,
+      captainStep,
+      ride,
+    };
+    const previousNavigation = currentNavigation.current;
 
-  useEffect(() => {
-    if (captainOtp.length === 4 && captainOtp === "4821") {
-      const timer = window.setTimeout(() => {
-        setCaptainStep("onboarding");
-      }, 250);
-      return () => window.clearTimeout(timer);
+    if (restoringNavigation.current) {
+      restoringNavigation.current = false;
+      currentNavigation.current = nextNavigation;
+      return;
     }
-  }, [captainOtp]);
+
+    if (!previousNavigation) {
+      currentNavigation.current = nextNavigation;
+      return;
+    }
+
+    const previousScreen = `${previousNavigation.role}:${previousNavigation.ride.status}:${previousNavigation.role === "passenger" ? previousNavigation.passengerStep : previousNavigation.captainStep}`;
+    const nextScreen = `${nextNavigation.role}:${nextNavigation.ride.status}:${nextNavigation.role === "passenger" ? nextNavigation.passengerStep : nextNavigation.captainStep}`;
+
+    const previousStep = previousNavigation.role === "passenger"
+      ? previousNavigation.passengerStep
+      : previousNavigation.captainStep;
+    if (previousScreen !== nextScreen && previousStep !== "splash") {
+      navigationHistory.current.push(previousNavigation);
+      setCanGoBack(true);
+    }
+    currentNavigation.current = nextNavigation;
+  }, [captainStep, passengerStep, ride, role]);
+
+  const goBack = () => {
+    const previousNavigation = navigationHistory.current.pop();
+    if (!previousNavigation) {
+      setCanGoBack(false);
+      return;
+    }
+
+    restoringNavigation.current = true;
+    currentNavigation.current = previousNavigation;
+    setCanGoBack(navigationHistory.current.length > 0);
+    setRole(previousNavigation.role);
+    setPassengerStep(previousNavigation.passengerStep);
+    setCaptainStep(previousNavigation.captainStep);
+    setRide(previousNavigation.ride);
+  };
 
   useEffect(() => {
     if (!toast) return;
@@ -342,27 +436,147 @@ function PinkRideStage2() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const demoScenario = useMemo(() => ({
-    requestTimer: 15,
-    captainEarnings: 72,
-  }), []);
+  const saveDemoAccount = (accountRole: Role, name: string, email: string) => {
+    const cleanedPhone = phone.replace(/\D/g, "");
+    if (!/^\d{10}$/.test(cleanedPhone)) {
+      setToast("Enter a valid 10-digit mobile number");
+      return false;
+    }
+    if (!name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setToast("Enter your name and a valid email address");
+      return false;
+    }
 
-  const bookRide = () => {
-    setRide((prev) => ({
-      ...prev,
-      status: "searching_captain",
-      pickup: "Current Location",
-      destination: "Vesu, Surat",
-      fare: 82,
-      captainEarnings: 72,
-      paymentMethod: "UPI",
-    }));
-    setPassengerStep("finding");
-    setRole("passenger");
+    const accountKey = `pinkride:demo-account:${accountRole}:${cleanedPhone}`;
+    try {
+      if (window.localStorage.getItem(accountKey)) {
+        setToast("An account already exists for this number");
+        return false;
+      }
+
+      window.localStorage.setItem(accountKey, JSON.stringify({
+        role: accountRole,
+        phone: cleanedPhone,
+        name: name.trim(),
+        email: email.trim(),
+        createdAt: new Date().toISOString(),
+      }));
+      return true;
+    } catch {
+      setToast("Could not save your account. Check browser storage and try again.");
+      return false;
+    }
+  };
+
+  const createPassengerAccount = () => {
+    if (!saveDemoAccount("passenger", passengerName, passengerEmail)) return;
+    setPassengerAccountPhone(phone.replace(/\D/g, ""));
+    setLoggedInRoles((previous) => ({ ...previous, passenger: true }));
+    setPassengerStep("permissions");
+    setToast("Passenger account created");
+  };
+
+  const createCaptainAccount = () => {
+    if (!saveDemoAccount("captain", captainName, captainEmail)) return;
+    setLoggedInRoles((previous) => ({ ...previous, captain: true }));
+    setCaptainStep("home");
+    setToast("Captain account created");
+  };
+
+  const signInDemoAccount = (accountRole: Role): boolean | null => {
+    const cleanedPhone = phone.replace(/\D/g, "");
+    const accountKey = `pinkride:demo-account:${accountRole}:${cleanedPhone}`;
+    let storedAccount: string | null;
+    try {
+      storedAccount = window.localStorage.getItem(accountKey);
+    } catch {
+      setToast("Could not access your saved account. Check browser storage and try again.");
+      return null;
+    }
+
+    if (!storedAccount) return false;
+
+    try {
+      const account: unknown = JSON.parse(storedAccount);
+      if (
+        typeof account !== "object"
+        || account === null
+        || !("role" in account)
+        || !("phone" in account)
+        || !("name" in account)
+        || !("email" in account)
+        || account.role !== accountRole
+        || account.phone !== cleanedPhone
+        || typeof account.name !== "string"
+        || typeof account.email !== "string"
+      ) {
+        setToast("Saved account details are invalid. Please contact support.");
+        return null;
+      }
+
+      if (accountRole === "passenger") {
+        setPassengerName(account.name);
+        setPassengerEmail(account.email);
+        setPassengerAccountPhone(account.phone);
+        setLoggedInRoles((previous) => ({ ...previous, passenger: true }));
+        setPassengerStep("home");
+      } else {
+        setCaptainName(account.name);
+        setCaptainEmail(account.email);
+        setLoggedInRoles((previous) => ({ ...previous, captain: true }));
+        setCaptainStep("home");
+      }
+      setToast(`Welcome back, ${account.name}`);
+      return true;
+    } catch {
+      setToast("Could not read your saved account. Please try again.");
+      return null;
+    }
+  };
+
+  const logout = () => {
+    setLoggedInRoles((previous) => ({ ...previous, [role]: false }));
+    setPhone("");
+    if (role === "passenger") {
+      setPassengerName("");
+      setPassengerEmail("");
+      setPassengerAccountPhone("");
+      setOtp("");
+      setPassengerStep("login");
+    } else {
+      setCaptainName("");
+      setCaptainEmail("");
+      setCaptainOtp("");
+      setOnline(false);
+      setCaptainStep("login");
+    }
+    navigationHistory.current = [];
+    restoringNavigation.current = true;
+    setCanGoBack(false);
+    setLogoutOpen(false);
+    setToast("You have been logged out");
+  };
+
+  const openPassengerRideHistory = () => {
+    const passengerPhone = passengerAccountPhone || phone.replace(/\D/g, "") || "guest";
+    try {
+      const history = parseRideHistory(
+        window.localStorage.getItem(`pinkride:ride-history:${passengerPhone}`),
+      );
+      setPassengerRideHistory(history.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)));
+    } catch {
+      setPassengerRideHistory([]);
+      setToast("Could not load your ride history. Check browser storage and try again.");
+    }
+    setPassengerStep("history");
   };
 
   const captainAcceptRide = () => {
-    setRide((prev) => ({ ...prev, status: "captain_assigned" }));
+    setRide((prev) => ({
+      ...prev,
+      captain: captainName.trim() || "Captain",
+      status: "captain_assigned",
+    }));
     setRole("captain");
     setToast("Ride accepted");
   };
@@ -379,16 +593,69 @@ function PinkRideStage2() {
     setRole("captain");
   };
 
-  const confirmPassengerPin = () => {
-    setRide((prev) => ({ ...prev, status: "ride_started" }));
+  const completeRide = () => {
+    const completedAt = new Date().toISOString();
+    const completedRide = { ...ride, status: "ride_completed" as const };
+    const historyEntry: RideHistoryEntry = {
+      id: completedRide.id,
+      createdAt: completedAt,
+      vehicleType: completedRide.vehicleType,
+      captain: completedRide.captain,
+      pickup: completedRide.pickup,
+      destination: completedRide.destination,
+      fare: completedRide.fare,
+    };
+    const historyKey = `pinkride:ride-history:${completedRide.passengerPhone || passengerAccountPhone || "guest"}`;
+    let updatedHistory = [historyEntry, ...passengerRideHistory.filter((entry) => entry.id !== historyEntry.id)]
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+    let historySaved = true;
+
+    try {
+      const savedHistory = parseRideHistory(window.localStorage.getItem(historyKey));
+      updatedHistory = [historyEntry, ...savedHistory.filter((entry) => entry.id !== historyEntry.id)]
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+      window.localStorage.setItem(historyKey, JSON.stringify(updatedHistory));
+    } catch {
+      historySaved = false;
+    }
+
+    setPassengerRideHistory(updatedHistory);
+    setRide(completedRide);
     setRole("captain");
-    setToast("Ride verified");
+    setToast(historySaved ? `₹${completedRide.captainEarnings} earned` : "Ride completed, but history could not be saved to browser storage.");
   };
 
-  const completeRide = () => {
-    setRide((prev) => ({ ...prev, status: "ride_completed", captainEarnings: 72 }));
-    setRole("captain");
-    setToast("₹72 earned");
+  const toggleCaptainAvailability = () => {
+    if (online) {
+      setOnline(false);
+      setCaptainStep("home");
+      setToast("You are offline");
+      return;
+    }
+
+    setOnline(true);
+    setToast("Showing a sample ride request");
+    setRide((prev) => ({ ...prev, status: "captain_requested" }));
+    setCaptainStep("request");
+  };
+
+  const shareRideDetails = async () => {
+    const details = `PinkRide demo trip\nRide type: ${getRideVehicleLabel(ride.vehicleType)}\nCaptain: ${ride.captain}\nPickup: ${ride.pickup}\nDestination: ${ride.destination}\nFare: ₹${ride.fare}\nThis is not live location tracking.`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "PinkRide trip details", text: details });
+        return;
+      }
+      if (!navigator.clipboard) {
+        setToast("Sharing is not supported by this browser.");
+        return;
+      }
+      await navigator.clipboard.writeText(details);
+      setToast("Trip details copied");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setToast("Could not share trip details. Please try again.");
+    }
   };
 
   const renderPassengerFlow = () => {
@@ -410,12 +677,11 @@ function PinkRideStage2() {
     if (currentPassengerStep === "onboarding") {
       return (
         <div className="mx-auto flex min-h-screen max-w-md flex-col bg-[#fffafc] px-5 pb-8 pt-6">
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-6 flex items-center">
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_20%,#f0d7e3,#d081a5_40%,#a6437a_80%)] text-sm font-bold text-white">P</div>
               <span className="text-lg font-semibold tracking-wide text-[#2a1d28]">PinkRide</span>
             </div>
-            <button onClick={() => setPassengerStep("login")} className="text-sm font-medium text-[#7d7780]">Skip</button>
           </div>
           <div className="flex h-[430px] flex-col rounded-[32px] bg-white p-4 shadow-[0_18px_40px_rgba(132,92,120,0.08)]">
             <div className="mb-6 flex justify-center gap-2">
@@ -430,7 +696,7 @@ function PinkRideStage2() {
             </div>
             <div className="mt-8 text-center">
               <h1 className="text-[30px] font-bold tracking-[-0.06em] text-[#241d27]">Move freely.</h1>
-              <p className="mt-3 text-[15px] leading-7 text-[#58545a]">Convenient bike rides designed specifically for women.</p>
+              <p className="mt-3 text-[15px] leading-7 text-[#58545a]">Bike, rickshaw and car rides designed around women&apos;s mobility.</p>
             </div>
           </div>
           <div className="mt-5 grid grid-cols-[1fr_112px] gap-3">
@@ -453,12 +719,19 @@ function PinkRideStage2() {
           </div>
 
           <div className="rounded-[28px] border border-[#f2dfe7] bg-white p-4 shadow-[0_18px_40px_rgba(132,92,120,0.06)]">
-            <label className="mb-2 block text-sm font-medium text-[#4c474d]">Mobile number</label>
+            <label htmlFor="passenger-phone" className="mb-2 block text-sm font-medium text-[#4c474d]">Mobile number</label>
             <div className="flex items-center gap-3 rounded-2xl border border-[#f0dfe8] bg-[#fffdfd] px-3 py-3 shadow-sm">
               <span className="rounded-full bg-[#f5edf2] px-2 py-1 text-sm font-semibold text-[#2d2a2d]">+91</span>
-              <input className="w-full border-0 bg-transparent text-[15px] text-[#1d1b1f] outline-none placeholder:text-[#908b90]" value="98765 43210" readOnly />
+              <input id="passenger-phone" className="w-full border-0 bg-transparent text-[15px] text-[#1d1b1f] outline-none placeholder:text-[#908b90]" type="tel" inputMode="numeric" autoComplete="tel-national" maxLength={10} placeholder="10-digit mobile number" value={phone} onChange={(event) => setPhone(event.target.value.replace(/\D/g, ""))} />
             </div>
-            <Button onClick={() => setPassengerStep("otp")} className="mt-5 w-full">Continue</Button>
+              <Button onClick={() => {
+                if (!/^\d{10}$/.test(phone.replace(/\D/g, ""))) {
+                  setToast("Enter a valid 10-digit mobile number");
+                  return;
+                }
+                setOtp("");
+                setPassengerStep("otp");
+              }} className="mt-5 w-full">Continue</Button>
           </div>
         </div>
       );
@@ -472,12 +745,18 @@ function PinkRideStage2() {
           </button>
           <div className="mb-8 text-center">
             <h1 className="text-[30px] font-bold tracking-[-0.05em] text-[#241d27]">Verify your number</h1>
-            <p className="mt-3 text-[15px] leading-6 text-[#655f63]">We&apos;ve sent a 4-digit code to +91 XXXXX XXXXX</p>
+            <p className="mt-3 text-[15px] leading-6 text-[#655f63]">Enter the 4-digit demo code for +91 {phone || "your number"}</p>
           </div>
           <div className="rounded-[30px] border border-[#f0dde7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.06)]">
             <OTPInput value={otp} onChange={setOtp} />
-            <p className="mt-5 text-center text-sm font-medium text-[#8d7d84]">Resend code in 00:30</p>
-            <Button onClick={() => setPassengerStep("profile")} className="mt-6 w-full" disabled={otp.length !== 4}>Continue</Button>
+            <p className="mt-5 text-center text-sm font-medium text-[#8d7d84]">Demo code: 4821</p>
+            <Button onClick={() => {
+              if (otp !== "4821") {
+                setToast("That code is incorrect. Use demo code 4821.");
+                return;
+              }
+              if (signInDemoAccount("passenger") === false) setPassengerStep("profile");
+            }} className="mt-6 w-full" disabled={otp.length !== 4}>Verify number</Button>
           </div>
         </div>
       );
@@ -492,24 +771,21 @@ function PinkRideStage2() {
           <div className="rounded-[28px] border border-[#f3dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.06)]">
             <div className="mb-6 flex items-center justify-center">
               <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_20%,#f7dbe8,#d78aa8_28%,#a6437a_90%)] text-2xl font-bold text-white shadow-md">
-                <span>PS</span>
-                <button className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#ead6e3] text-[#5e2645]">
-                  <Plus className="h-4 w-4" />
-                </button>
+                <span>{getInitials(passengerName, "P")}</span>
               </div>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="mb-2 block text-sm font-medium text-[#4b484d]">Full name</label>
-                <input value={mockUser.name} readOnly className="w-full rounded-2xl border border-[#ebd9e3] bg-[#fffdfd] px-4 py-3 text-[15px] text-[#1f1f22] outline-none" />
+                <label htmlFor="passenger-name" className="mb-2 block text-sm font-medium text-[#4b484d]">Full name</label>
+                <input id="passenger-name" value={passengerName} onChange={(event) => setPassengerName(event.target.value)} autoComplete="name" placeholder="Your full name" className="w-full rounded-2xl border border-[#ebd9e3] bg-[#fffdfd] px-4 py-3 text-[15px] text-[#1f1f22] outline-none" />
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium text-[#4b484d]">Email</label>
-                <input value={mockUser.email} readOnly className="w-full rounded-2xl border border-[#ebd9e3] bg-[#fffdfd] px-4 py-3 text-[15px] text-[#1f1f22] outline-none" />
+                <label htmlFor="passenger-email" className="mb-2 block text-sm font-medium text-[#4b484d]">Email</label>
+                <input id="passenger-email" type="email" value={passengerEmail} onChange={(event) => setPassengerEmail(event.target.value)} autoComplete="email" placeholder="you@example.com" className="w-full rounded-2xl border border-[#ebd9e3] bg-[#fffdfd] px-4 py-3 text-[15px] text-[#1f1f22] outline-none" />
               </div>
             </div>
             <p className="mt-5 text-center text-xs leading-5 text-[#6d6a6e]">PinkRide is exclusively for women passengers and women captains.</p>
-            <Button onClick={() => setPassengerStep("permissions")} className="mt-6 w-full">Continue</Button>
+            <Button onClick={createPassengerAccount} className="mt-6 w-full">Create passenger account</Button>
           </div>
         </div>
       );
@@ -527,20 +803,18 @@ function PinkRideStage2() {
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f9edf3] text-[#a6437a]"><MapPin className="h-5 w-5" /></span>
                 <div>
                   <h2 className="font-semibold text-[#1f1f22]">Location</h2>
-                  <p className="text-xs text-[#706b71]">Used to find your pickup location and track your ride.</p>
+                  <p className="text-xs text-[#706b71]">Live location is not available in this demo.</p>
                 </div>
               </div>
-              <Button onClick={() => setToast("Location enabled")} variant="secondary" className="mt-4 w-full">Allow location</Button>
             </div>
             <div className="rounded-[24px] border border-[#f0dde7] bg-white p-4 shadow-sm">
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f9edf3] text-[#a6437a]"><Bell className="h-5 w-5" /></span>
                 <div>
                   <h2 className="font-semibold text-[#1f1f22]">Notifications</h2>
-                  <p className="text-xs text-[#706b71]">Get important updates about your ride.</p>
+                  <p className="text-xs text-[#706b71]">Push notifications are not connected in this demo.</p>
                 </div>
               </div>
-              <Button onClick={() => setToast("Notifications enabled")} variant="secondary" className="mt-4 w-full">Allow notifications</Button>
             </div>
           </div>
           <div className="mt-6"><Button onClick={() => setPassengerStep("home")} className="w-full">Continue</Button></div>
@@ -553,12 +827,12 @@ function PinkRideStage2() {
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] pb-24 pt-6">
           <header className="mb-4 flex items-center justify-between px-4">
             <div>
-              <p className="text-[13px] font-medium text-[#8a7d85]">Good morning, Priya 👋</p>
+              <p className="text-[13px] font-medium text-[#8a7d85]">Good morning, {passengerName.trim() || "there"} 👋</p>
               <h1 className="mt-1 text-[28px] font-bold tracking-[-0.06em] text-[#211d20]">Where are you going today?</h1>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_20%,#f7dbe8,#d78aa8_28%,#a6437a_90%)] text-sm font-bold text-white shadow-md">PS</div>
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_20%,#f7dbe8,#d78aa8_28%,#a6437a_90%)] text-sm font-bold text-white shadow-md">{getInitials(passengerName, "P")}</div>
           </header>
-          <div className="h-[420px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_40px_rgba(39,19,31,0.08)] px-4">
+          <div className="h-[280px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_40px_rgba(39,19,31,0.08)] px-4">
             <MapView mode="home" />
           </div>
           <div className="-mt-4 mx-4 rounded-[30px] border border-[#f1dfe8] bg-white p-4 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
@@ -575,11 +849,11 @@ function PinkRideStage2() {
             </div>
           </div>
           <div className="mt-5 grid grid-cols-3 gap-3 px-4">
-            {[{ title: "Book a Pink Bike", subtitle: "Fast & affordable", icon: Sparkles }, { title: "Safety", subtitle: "Your safety center", icon: ShieldPlus }, { title: "Ride history", subtitle: "View your previous rides", icon: BriefcaseBusiness }].map((item) => (
+            {[{ title: "Book a ride", subtitle: "Bike, rickshaw or car", icon: Sparkles }, { title: "Safety", subtitle: "Safety information", icon: ShieldPlus }, { title: "Ride history", subtitle: "Your completed trips", icon: BriefcaseBusiness }].map((item) => (
               <button key={item.title} onClick={() => {
                 if (item.title === "Safety") setPassengerStep("safety");
-                if (item.title === "Ride history") setPassengerStep("history");
-                if (item.title === "Book a Pink Bike") setPassengerStep("search");
+                if (item.title === "Ride history") openPassengerRideHistory();
+                if (item.title === "Book a ride") setPassengerStep("search");
               }} className="rounded-[24px] border border-[#f0dfe7] bg-white p-3 text-left shadow-sm">
                 <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[#f8edf3] text-[#a6437a]"><item.icon className="h-4 w-4" /></div>
                 <p className="text-sm font-semibold text-[#1f1f22]">{item.title}</p>
@@ -629,24 +903,33 @@ function PinkRideStage2() {
     }
 
     if (currentPassengerStep === "ride-options") {
+      const rideOptions: Array<{
+        id: RideVehicleType;
+        name: string;
+        eta: string;
+        fare: number;
+        captainEarnings: number;
+        tag: string;
+      }> = [
+        { id: "bike", name: "Pink Bike", eta: "2 min away", fare: 82, captainEarnings: 72, tag: "Fast & affordable" },
+        { id: "rickshaw", name: "Pink Rickshaw", eta: "5 min away", fare: 126, captainEarnings: 111, tag: "More space" },
+        { id: "car", name: "Pink 4 Wheeler", eta: "7 min away", fare: 210, captainEarnings: 184, tag: "Comfortable ride" },
+      ];
+
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
           <div className="mb-4 h-[280px] overflow-hidden rounded-[28px] border border-[#f1dfe8] bg-white p-2 shadow-sm"><MapView mode="route" routeProgress={50} /></div>
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-4 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
             <h2 className="mb-4 text-[24px] font-bold tracking-[-0.05em] text-[#211d20]">Choose your ride</h2>
             <div className="space-y-3">
-              {[
-                { id: "pink-bike", name: "Pink Bike", eta: "2 min away", fare: 82, tag: "Fast & affordable" },
-                { id: "pink-auto", name: "Pink Auto", eta: "5 min away", fare: 126, tag: "More space", badge: "Coming soon" },
-              ].map((option) => (
-                <button key={option.id} onClick={() => setRide((prev) => ({ ...prev, fare: option.fare }))} className={cn("flex w-full items-center justify-between rounded-[24px] border p-4 text-left transition-all", option.id === "pink-bike" ? "border-[#a6437a] bg-[#fff4f8]" : "border-[#f0dde7] bg-white") }>
+              {rideOptions.map((option) => (
+                <button key={option.id} aria-pressed={ride.vehicleType === option.id} onClick={() => setRide((prev) => ({ ...prev, vehicleType: option.id, fare: option.fare, captainEarnings: option.captainEarnings }))} className={cn("flex w-full items-center justify-between rounded-[24px] border p-4 text-left transition-all", ride.vehicleType === option.id ? "border-[#a6437a] bg-[#fff4f8]" : "border-[#f0dfe7] bg-white")}>
                   <div>
-                    <div className="flex items-center gap-2"><h3 className="text-base font-semibold text-[#1f1f22]">{option.name}</h3>{option.id === "pink-bike" && <Check className="h-4 w-4 text-[#a6437a]" />}</div>
+                    <div className="flex items-center gap-2"><h3 className="text-base font-semibold text-[#1f1f22]">{option.name}</h3>{ride.vehicleType === option.id && <Check className="h-4 w-4 text-[#a6437a]" />}</div>
                     <p className="mt-1 text-sm text-[#69646a]">Women captain</p>
                     <p className="mt-1 text-sm text-[#69646a]">{option.eta}</p>
                     <div className="mt-2 flex items-center gap-2"><span className="text-xl font-bold text-[#1f1f22]">₹{option.fare}</span><span className="text-xs text-[#787178]">{option.tag}</span></div>
                   </div>
-                  {option.badge && <span className="rounded-full bg-[#f2ecf2] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#6d5a67]">{option.badge}</span>}
                 </button>
               ))}
             </div>
@@ -664,16 +947,10 @@ function PinkRideStage2() {
             <div className="mt-4 space-y-3 text-sm text-[#5f5a60]">
               <div className="flex justify-between"><span>Pickup</span><span className="font-medium text-[#1f1f22]">Current Location</span></div>
               <div className="flex justify-between"><span>Destination</span><span className="font-medium text-[#1f1f22]">{ride.destination}</span></div>
+              <div className="flex justify-between"><span>Ride type</span><span className="font-medium text-[#1f1f22]">{getRideVehicleLabel(ride.vehicleType)}</span></div>
             </div>
             <div className="mt-6 rounded-[24px] bg-[#fff7fa] p-4">
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between"><span>Base fare</span><span>₹30</span></div>
-                <div className="flex justify-between"><span>Distance</span><span>₹46</span></div>
-                <div className="flex justify-between"><span>Platform fee</span><span>₹6</span></div>
-              </div>
-              <div className="mt-4 border-t border-[#f0dfe7] pt-3 text-base font-semibold text-[#1f1f22]">
-                <div className="flex justify-between"><span>Total</span><span>₹82</span></div>
-              </div>
+              <div className="flex justify-between text-base font-semibold text-[#1f1f22]"><span>Estimated total</span><span>₹{ride.fare}</span></div>
             </div>
             <Button onClick={() => setPassengerStep("confirm-booking")} className="mt-6 w-full">Confirm PinkRide</Button>
           </div>
@@ -689,13 +966,13 @@ function PinkRideStage2() {
             <div className="mt-5 space-y-3 text-sm text-[#5c565c]">
               <div className="flex justify-between"><span>Pickup</span><span className="font-medium text-[#1f1f22]">Current Location</span></div>
               <div className="flex justify-between"><span>Destination</span><span className="font-medium text-[#1f1f22]">{ride.destination}</span></div>
-              <div className="flex justify-between"><span>Ride type</span><span className="font-medium text-[#1f1f22]">Pink Bike</span></div>
-              <div className="flex justify-between"><span>Estimated fare</span><span className="font-medium text-[#1f1f22]">₹82</span></div>
+              <div className="flex justify-between"><span>Ride type</span><span className="font-medium text-[#1f1f22]">{getRideVehicleLabel(ride.vehicleType)}</span></div>
+              <div className="flex justify-between"><span>Estimated fare</span><span className="font-medium text-[#1f1f22]">₹{ride.fare}</span></div>
             </div>
-            <div className="mt-5 rounded-2xl border border-[#e9d7e1] bg-[#fff7fa] p-3 text-sm font-medium text-[#a6437a]">Women-only ride</div>
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">Demo booking only. Passenger and captain identities are not verified.</div>
             <div className="mt-6 grid grid-cols-2 gap-3">
               <Button variant="secondary" onClick={() => setPassengerStep("ride-options")}>Change ride</Button>
-              <Button onClick={() => { setRide((prev) => ({ ...prev, status: "searching_captain" })); setPassengerStep("finding"); }}>Book PinkRide</Button>
+              <Button onClick={() => { setRide((prev) => ({ ...prev, passenger: passengerName.trim() || "Passenger", passengerPhone: passengerAccountPhone || phone.replace(/\D/g, ""), id: `PR-${Date.now()}`, createdAt: new Date().toISOString(), status: "searching_captain" })); setPassengerStep("finding"); }}>Book PinkRide</Button>
             </div>
           </div>
         </div>
@@ -711,7 +988,7 @@ function PinkRideStage2() {
           <div className="-mt-12 mx-auto max-w-[310px] rounded-[28px] border border-[#f0dde7] bg-white p-4 text-center shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
             <div className="mb-4 flex items-center justify-center gap-3"><div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-[#f8edf3] text-[#a6437a]"><motion.div animate={{ scale: [1, 1.6, 1], opacity: [0.7, 0, 0.7] }} transition={{ duration: 1.8, repeat: Infinity }} className="absolute inset-0 rounded-full border border-[#a6437a]/50" /><MapPin className="h-5 w-5" /></div></div>
             <h2 className="text-[22px] font-bold tracking-[-0.05em] text-[#1d1b1f]">Finding your PinkRide captain...</h2>
-            <p className="mt-2 text-sm text-[#655f63]">Matching you with a verified woman captain nearby.</p>
+            <p className="mt-2 text-sm text-[#655f63]">This is a sample booking. No nearby captain is contacted in the demo.</p>
           </div>
         </div>
       );
@@ -722,20 +999,19 @@ function PinkRideStage2() {
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
           <div className="h-[420px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" routeProgress={66} /></div>
           <div className="-mt-4 rounded-[30px] border border-[#f0dfe7] bg-white p-4 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
-            <h2 className="text-[24px] font-bold tracking-[-0.05em] text-[#1f1f22]">Your captain is on the way</h2>
+            <h2 className="text-[24px] font-bold tracking-[-0.05em] text-[#1f1f22]">Sample captain assigned</h2>
             <div className="mt-4 flex items-center gap-3 rounded-2xl bg-[#fff7fa] p-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_20%,#f6dbe9,#d98ca9_28%,#a6437a_85%)] text-sm font-bold text-white">AP</div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_20%,#f6dbe9,#d98ca9_28%,#a6437a_85%)] text-sm font-bold text-white">{getInitials(ride.captain, "CP")}</div>
               <div className="flex-1">
-                <div className="flex items-center gap-2"><p className="font-semibold text-[#1f1f22]">Ananya Patel</p><span className="rounded-full bg-[#f2ebf0] px-2 py-0.5 text-[10px] font-medium text-[#a6437a]">Verified</span></div>
-                <div className="mt-1 flex items-center gap-2 text-sm text-[#625c60]"><Star className="h-3.5 w-3.5 fill-[#f6b153] text-[#f6b153]" /> 4.9 <span>•</span> <span>1,248 rides</span></div>
+                <div className="flex items-center gap-2"><p className="font-semibold text-[#1f1f22]">{ride.captain}</p><span className="rounded-full bg-[#f2ebf0] px-2 py-0.5 text-[10px] font-medium text-[#a6437a]">Demo captain</span></div>
+                <div className="mt-1 flex items-center gap-2 text-sm text-[#625c60]"><Star className="h-3.5 w-3.5 fill-[#f6b153] text-[#f6b153]" /> Sample rating and trip history</div>
               </div>
-              <span className="text-sm font-semibold text-[#a6437a]">3 min away</span>
+              <span className="text-sm font-semibold text-[#a6437a]">Sample ETA: 3 min</span>
             </div>
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              <button className="rounded-2xl border border-[#f0dfe7] bg-[#fffafd] p-3 text-center text-sm font-medium text-[#2f2d31]"><Phone className="mx-auto mb-2 h-4 w-4" /> Call</button>
-              <button className="rounded-2xl border border-[#f0dfe7] bg-[#fffafd] p-3 text-center text-sm font-medium text-[#2f2d31]"><MessageSquareText className="mx-auto mb-2 h-4 w-4" /> Chat</button>
-              <button onClick={() => setPassengerStep("safety")} className="rounded-2xl border border-[#f0dfe7] bg-[#fffafd] p-3 text-center text-sm font-medium text-[#2f2d31]"><ShieldCheck className="mx-auto mb-2 h-4 w-4" /> Safety</button>
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
+              This captain profile, rating and arrival estimate are sample data. Calls and chat are unavailable.
             </div>
+            <Button onClick={() => setPassengerStep("safety")} variant="secondary" className="mt-3 w-full">Safety information</Button>
           </div>
         </div>
       );
@@ -747,13 +1023,13 @@ function PinkRideStage2() {
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
             <h2 className="text-[28px] font-bold tracking-[-0.06em] text-[#211d20]">Your captain has arrived</h2>
             <div className="mt-5 flex items-center gap-3 rounded-[24px] bg-[#fff7fa] p-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_20%,#f6dbe9,#d98ca9_28%,#a6437a_85%)] text-sm font-bold text-white">AP</div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_20%,#f6dbe9,#d98ca9_28%,#a6437a_85%)] text-sm font-bold text-white">{getInitials(ride.captain, "CP")}</div>
               <div>
-                <p className="font-semibold text-[#1f1f22]">Ananya Patel</p>
-                <p className="text-sm text-[#626166]">Honda Activa • GJ 05 AB 1234</p>
+                <p className="font-semibold text-[#1f1f22]">{ride.captain}</p>
+                <p className="text-sm text-[#626166]">Sample captain profile · no vehicle assigned</p>
               </div>
             </div>
-            <div className="mt-5 rounded-2xl border border-[#f0dfe7] bg-[#fffdfd] p-3 text-sm text-[#605d63]">Check the vehicle number before starting your ride.</div>
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">Demo only. A real ride should show the verified driver and vehicle details here.</div>
             <Button onClick={() => setPassengerStep("ride-pin")} className="mt-6 w-full">Start Ride</Button>
           </div>
         </div>
@@ -780,14 +1056,13 @@ function PinkRideStage2() {
           <div className="h-[520px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" routeProgress={84} /></div>
           <div className="-mt-4 rounded-[30px] border border-[#f0dfe7] bg-white p-4 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
             <div className="flex items-center justify-between">
-              <div><p className="text-sm text-[#6b666a]">You&apos;re on your way</p><h2 className="text-[22px] font-bold tracking-[-0.04em] text-[#221d20]">Ananya Patel</h2></div>
-              <span className="rounded-full bg-[#f3edf0] px-2 py-1 text-xs font-medium text-[#a6437a]">ETA 12 min</span>
+              <div><p className="text-sm text-[#6b666a]">Demo ride in progress</p><h2 className="text-[22px] font-bold tracking-[-0.04em] text-[#221d20]">{ride.captain}</h2></div>
+              <span className="rounded-full bg-[#f3edf0] px-2 py-1 text-xs font-medium text-[#a6437a]">Sample ETA: 12 min</span>
             </div>
             <div className="mt-3 text-sm text-[#5e575d]">Destination: {ride.destination}</div>
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              <button onClick={() => setPassengerStep("share")} className="rounded-2xl border border-[#f0dfe7] bg-[#fffafd] p-3 text-center text-sm font-medium text-[#2f2d31]"><Navigation className="mx-auto mb-2 h-4 w-4" /> Share ride</button>
-              <button className="rounded-2xl border border-[#f0dfe7] bg-[#fffafd] p-3 text-center text-sm font-medium text-[#2f2d31]"><MessageSquareText className="mx-auto mb-2 h-4 w-4" /> Chat</button>
-              <button onClick={() => setPassengerStep("safety")} className="rounded-2xl border border-[#f0dfe7] bg-[#fffafd] p-3 text-center text-sm font-medium text-[#2f2d31]"><ShieldCheck className="mx-auto mb-2 h-4 w-4" /> Safety</button>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <Button variant="secondary" onClick={() => setPassengerStep("share")}>Share trip details</Button>
+              <Button variant="secondary" onClick={() => setPassengerStep("safety")}>Safety information</Button>
             </div>
           </div>
         </div>
@@ -808,8 +1083,11 @@ function PinkRideStage2() {
                 </div>
               </div>
               <div className="space-y-3">
-                {['Emergency SOS', 'Share Live Ride', 'Trusted Contacts', 'Call Support', 'Report an Issue'].map((item) => (
-                  <button key={item} onClick={() => { if (item === 'Emergency SOS') setSosOpen(true); else if (item === 'Share Live Ride') setPassengerStep('share'); else setToast(item); }} className="flex w-full items-center justify-between rounded-2xl border border-[#f0dfe7] bg-white px-3 py-3 text-left text-sm font-medium text-[#2b2a2d]">
+                <p className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
+                  Emergency response and live location sharing are not connected in this demo. Call 112 for immediate help.
+                </p>
+                {["Emergency help", "Share trip details"].map((item) => (
+                  <button key={item} onClick={() => { if (item === "Emergency help") setSosOpen(true); else setPassengerStep("share"); }} className="flex w-full items-center justify-between rounded-2xl border border-[#f0dfe7] bg-white px-3 py-3 text-left text-sm font-medium text-[#2b2a2d]">
                     <span>{item}</span><ChevronRight className="h-4 w-4 text-[#7e767a]" />
                   </button>
                 ))}
@@ -824,18 +1102,17 @@ function PinkRideStage2() {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-8">
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
-            <h2 className="text-[26px] font-bold tracking-[-0.05em] text-[#201d20]">Share your live ride</h2>
+            <h2 className="text-[26px] font-bold tracking-[-0.05em] text-[#201d20]">Share trip details</h2>
+            <p className="mt-2 text-sm text-[#655f63]">This shares trip information only; it does not include live location.</p>
             <div className="mt-5 rounded-[24px] bg-[#fff7fa] p-4 text-sm text-[#5f5a60]">
-              <div className="flex justify-between"><span>Captain</span><span className="font-medium text-[#1f1f22]">Ananya Patel</span></div>
-              <div className="mt-2 flex justify-between"><span>Pickup</span><span className="font-medium text-[#1f1f22]">Current Location</span></div>
+              <div className="flex justify-between"><span>Captain</span><span className="font-medium text-[#1f1f22]">{ride.captain}</span></div>
+              <div className="mt-2 flex justify-between"><span>Ride type</span><span className="font-medium text-[#1f1f22]">{getRideVehicleLabel(ride.vehicleType)}</span></div>
+              <div className="mt-2 flex justify-between"><span>Pickup</span><span className="font-medium text-[#1f1f22]">{ride.pickup}</span></div>
               <div className="mt-2 flex justify-between"><span>Destination</span><span className="font-medium text-[#1f1f22]">{ride.destination}</span></div>
+              <div className="mt-2 flex justify-between"><span>Fare</span><span className="font-medium text-[#1f1f22]">₹{ride.fare}</span></div>
             </div>
             <div className="mt-5 space-y-3">
-              {['WhatsApp', 'SMS', 'Copy link'].map((item) => (
-                <button key={item} onClick={() => setToast(item === 'Copy link' ? 'Ride details copied' : `${item} shared`)} className="flex w-full items-center justify-between rounded-2xl border border-[#f0dde7] bg-white px-4 py-3 text-sm font-medium text-[#2b2a2d]">
-                  <span>{item}</span><ChevronRight className="h-4 w-4 text-[#7d777d]" />
-                </button>
-              ))}
+              <Button onClick={shareRideDetails} className="w-full">Share trip details</Button>
             </div>
           </div>
         </div>
@@ -852,9 +1129,9 @@ function PinkRideStage2() {
             <div className="mt-6 grid grid-cols-3 gap-2 rounded-[24px] bg-[#fff7fa] p-4 text-sm text-[#5c5a5d]">
               <div><p className="text-[#847d82]">Distance</p><p className="mt-1 font-semibold text-[#1f1f22]">6.4 km</p></div>
               <div><p className="text-[#847d82]">Duration</p><p className="mt-1 font-semibold text-[#1f1f22]">18 min</p></div>
-              <div><p className="text-[#847d82]">Fare</p><p className="mt-1 font-semibold text-[#1f1f22]">₹82</p></div>
+              <div><p className="text-[#847d82]">Fare</p><p className="mt-1 font-semibold text-[#1f1f22]">₹{ride.fare}</p></div>
             </div>
-            <Button onClick={() => { setRide((prev) => ({ ...prev, status: "payment_completed" })); setPassengerStep("payment"); }} className="mt-6 w-full">Continue to payment</Button>
+            <Button onClick={() => { setRide((prev) => ({ ...prev, status: "payment_pending" })); setPassengerStep("payment"); }} className="mt-6 w-full">Continue to demo payment</Button>
           </div>
         </div>
       );
@@ -865,15 +1142,16 @@ function PinkRideStage2() {
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-8">
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
             <h2 className="text-[28px] font-bold tracking-[-0.05em] text-[#201d20]">Complete payment</h2>
-            <div className="mt-4 text-center text-[34px] font-bold tracking-[-0.08em] text-[#201d20]">₹82</div>
+            <div className="mt-4 text-center text-[34px] font-bold tracking-[-0.08em] text-[#201d20]">₹{ride.fare}</div>
             <div className="mt-6 space-y-3">
               {['UPI', 'Credit / Debit Card', 'Cash'].map((method) => (
-                <button key={method} className="flex w-full items-center justify-between rounded-[22px] border border-[#f0dde7] bg-white p-3 text-left text-sm font-medium text-[#2f2d31]">
-                  <span>{method}</span><Check className="h-4 w-4 text-[#a6437a]" />
+                <button key={method} type="button" aria-pressed={ride.paymentMethod === method} onClick={() => setRide((prev) => ({ ...prev, paymentMethod: method }))} className={cn("flex w-full items-center justify-between rounded-[22px] border p-3 text-left text-sm font-medium text-[#2f2d31]", ride.paymentMethod === method ? "border-[#a6437a] bg-[#fff4f8]" : "border-[#f0dde7] bg-white")}>
+                  <span>{method}</span>{ride.paymentMethod === method && <Check className="h-4 w-4 text-[#a6437a]" />}
                 </button>
               ))}
             </div>
-            <Button onClick={() => { setRide((prev) => ({ ...prev, status: "rated" })); setPassengerStep("rating"); }} className="mt-6 w-full">Pay ₹82</Button>
+            <p className="mt-4 rounded-2xl bg-amber-50 p-3 text-xs leading-5 text-amber-950">Demo only: no money is charged and no payment provider is connected.</p>
+            <Button onClick={() => { setRide((prev) => ({ ...prev, status: "rated" })); setPassengerStep("rating"); }} className="mt-4 w-full">Simulate demo payment · ₹{ride.fare}</Button>
           </div>
         </div>
       );
@@ -885,8 +1163,8 @@ function PinkRideStage2() {
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
             <h2 className="text-[28px] font-bold tracking-[-0.05em] text-[#201d20]">How was your ride?</h2>
             <div className="mt-5 flex items-center justify-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_20%,#f6dbe9,#d98ca9_28%,#a6437a_85%)] text-sm font-bold text-white">AP</div>
-              <div><p className="font-semibold text-[#1f1f22]">Ananya Patel</p></div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_20%,#f6dbe9,#d98ca9_28%,#a6437a_85%)] text-sm font-bold text-white">{getInitials(ride.captain, "CP")}</div>
+              <div><p className="font-semibold text-[#1f1f22]">{ride.captain}</p></div>
             </div>
             <div className="mt-5 flex justify-center gap-2">
               {[1, 2, 3, 4, 5].map((value) => (
@@ -906,15 +1184,18 @@ function PinkRideStage2() {
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-8">
           <div className="mb-5 flex items-center justify-between"><h2 className="text-[28px] font-bold tracking-[-0.06em] text-[#201d20]">My Rides</h2></div>
           <div className="space-y-3">
-            {[
-              { date: "29 Sep", name: "Ananya Patel", route: "Adajan → Vesu", amount: "₹82", status: "Completed" },
-              { date: "26 Sep", name: "Kavya Shah", route: "Vesu → Dumas", amount: "₹96", status: "Completed" },
-            ].map((item) => (
-              <button key={item.date} onClick={() => setToast("Ride details open")} className="w-full rounded-[24px] border border-[#f0dfe7] bg-white p-4 text-left shadow-sm">
-                <div className="flex items-center justify-between"><span className="text-xs font-medium text-[#826d75]">{item.date}</span><span className="rounded-full bg-[#ecfaf1] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#166f40]">{item.status}</span></div>
-                <div className="mt-3 flex items-center justify-between"><div><p className="font-semibold text-[#1f1f22]">{item.name}</p><p className="mt-1 text-sm text-[#676167]">{item.route}</p></div><p className="text-base font-semibold text-[#201d20]">{item.amount}</p></div>
-              </button>
-            ))}
+            {passengerRideHistory.length === 0 ? (
+              <div className="rounded-[24px] border border-[#f0dfe7] bg-white p-5 text-center text-sm text-[#676167] shadow-sm">
+                Your completed rides will appear here.
+              </div>
+            ) : (
+              passengerRideHistory.map((item) => (
+                <div key={item.id} className="w-full rounded-[24px] border border-[#f0dfe7] bg-white p-4 text-left shadow-sm">
+                  <div className="flex items-center justify-between"><span className="text-xs font-medium text-[#826d75]">{new Date(item.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</span><span className="rounded-full bg-[#ecfaf1] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#166f40]">Completed</span></div>
+                  <div className="mt-3 flex items-center justify-between"><div><p className="font-semibold text-[#1f1f22]">{item.vehicleType ? `${getRideVehicleLabel(item.vehicleType)} · ` : ""}{item.captain}</p><p className="mt-1 text-sm text-[#676167]">{item.pickup} → {item.destination}</p></div><p className="text-base font-semibold text-[#201d20]">₹{item.fare}</p></div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       );
@@ -945,12 +1226,19 @@ function PinkRideStage2() {
             <p className="mt-3 text-[15px] leading-6 text-[#6a6368]">Help women move safely around the city.</p>
           </div>
           <div className="rounded-[28px] border border-[#f2dfe7] bg-white p-4 shadow-[0_18px_40px_rgba(132,92,120,0.06)]">
-            <label className="mb-2 block text-sm font-medium text-[#4c474d]">Mobile number</label>
+            <label htmlFor="captain-phone" className="mb-2 block text-sm font-medium text-[#4c474d]">Mobile number</label>
             <div className="flex items-center gap-3 rounded-2xl border border-[#f0dfe8] bg-[#fffdfd] px-3 py-3 shadow-sm">
               <span className="rounded-full bg-[#f5edf2] px-2 py-1 text-sm font-semibold text-[#2d2a2d]">+91</span>
-              <input value="98765 43210" readOnly className="w-full border-0 bg-transparent text-[15px] text-[#1d1b1f] outline-none" />
+              <input id="captain-phone" type="tel" inputMode="numeric" autoComplete="tel-national" maxLength={10} placeholder="10-digit mobile number" value={phone} onChange={(event) => setPhone(event.target.value.replace(/\D/g, ""))} className="w-full border-0 bg-transparent text-[15px] text-[#1d1b1f] outline-none" />
             </div>
-            <Button onClick={() => setCaptainStep("otp")} className="mt-5 w-full">Continue</Button>
+              <Button onClick={() => {
+                if (!/^\d{10}$/.test(phone.replace(/\D/g, ""))) {
+                  setToast("Enter a valid 10-digit mobile number");
+                  return;
+                }
+                setCaptainOtp("");
+                setCaptainStep("otp");
+              }} className="mt-5 w-full">Continue</Button>
           </div>
         </div>
       );
@@ -962,12 +1250,18 @@ function PinkRideStage2() {
           <button onClick={() => setCaptainStep("login")} className="mb-5 flex items-center gap-2 text-sm font-medium text-[#4a464b]"><ArrowLeft className="h-4 w-4" /> Back</button>
           <div className="mb-8 text-center">
             <h1 className="text-[30px] font-bold tracking-[-0.05em] text-[#241d27]">Verify your number</h1>
-            <p className="mt-3 text-[15px] leading-6 text-[#655f63]">We&apos;ve sent a 4-digit code to +91 XXXXX XXXXX</p>
+            <p className="mt-3 text-[15px] leading-6 text-[#655f63]">Enter the 4-digit demo code for +91 {phone || "your number"}</p>
           </div>
           <div className="rounded-[30px] border border-[#f0dde7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.06)]">
             <OTPInput value={captainOtp} onChange={setCaptainOtp} />
             <p className="mt-5 text-center text-sm font-medium text-[#8d7d84]">Demo code: 4821</p>
-            <Button onClick={() => setCaptainStep("onboarding")} className="mt-6 w-full" disabled={captainOtp.length !== 4}>Continue</Button>
+            <Button onClick={() => {
+              if (captainOtp !== "4821") {
+                setToast("That code is incorrect. Use demo code 4821.");
+                return;
+              }
+              if (signInDemoAccount("captain") === false) setCaptainStep("onboarding");
+            }} className="mt-6 w-full" disabled={captainOtp.length !== 4}>Verify number</Button>
           </div>
         </div>
       );
@@ -987,7 +1281,17 @@ function PinkRideStage2() {
               <div className="flex items-center gap-3 rounded-2xl bg-[#fff7fa] p-3"><Check className="h-4 w-4 text-[#a6437a]" /> Women-only rides</div>
               <div className="flex items-center gap-3 rounded-2xl bg-[#fff7fa] p-3"><Check className="h-4 w-4 text-[#a6437a]" /> Safety support</div>
             </div>
-            <Button onClick={() => setCaptainStep("home")} className="mt-6 w-full">Start registration</Button>
+            <div className="mt-5 space-y-4">
+              <div>
+                <label htmlFor="captain-name" className="mb-2 block text-sm font-medium text-[#4b484d]">Full name</label>
+                <input id="captain-name" value={captainName} onChange={(event) => setCaptainName(event.target.value)} autoComplete="name" placeholder="Your full name" className="w-full rounded-2xl border border-[#ebd9e3] bg-[#fffdfd] px-4 py-3 text-[15px] text-[#1f1f22] outline-none" />
+              </div>
+              <div>
+                <label htmlFor="captain-email" className="mb-2 block text-sm font-medium text-[#4b484d]">Email</label>
+                <input id="captain-email" type="email" value={captainEmail} onChange={(event) => setCaptainEmail(event.target.value)} autoComplete="email" placeholder="you@example.com" className="w-full rounded-2xl border border-[#ebd9e3] bg-[#fffdfd] px-4 py-3 text-[15px] text-[#1f1f22] outline-none" />
+              </div>
+            </div>
+            <Button onClick={createCaptainAccount} className="mt-6 w-full">Create captain account</Button>
           </div>
         </div>
       );
@@ -996,26 +1300,26 @@ function PinkRideStage2() {
     if (currentCaptainStep === "home") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] pb-24 pt-6">
-          <CaptainHeader title="Good morning, Ananya" subtitle="Verified Pink Captain" />
+          <CaptainHeader title={`Good morning, ${captainName.trim() || "Captain"}`} subtitle="PinkRide Captain" name={captainName} />
           <div className="px-4">
             <div className="rounded-[28px] border border-[#f0dfe7] bg-white p-4 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
               <div className="mb-3 flex items-center justify-between">
-                <div className="text-sm text-[#726b71]">Availability</div>
-                <span className={cn("rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]", online ? "bg-[#ecfaf1] text-[#166f40]" : "bg-[#f7edf2] text-[#a6437a]")}>{online ? "Online" : "Offline"}</span>
+                <div className="text-sm text-[#726b71]">Demo availability</div>
+                <span className={cn("rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]", online ? "bg-[#ecfaf1] text-[#166f40]" : "bg-[#f7edf2] text-[#a6437a]")}>{online ? "Demo online" : "Offline"}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <div className={cn("flex flex-1 items-center justify-center rounded-full py-4 text-base font-semibold", online ? "bg-[#a6437a] text-white" : "bg-[#f8edf3] text-[#8f3d69]")}>
-                  {online ? "You’re online" : "Go Online"}
+                  {online ? "Demo mode active" : "Not accepting real rides"}
                 </div>
               </div>
-              <Button onClick={() => { setOnline(true); setToast("You're now online"); setRide((prev) => ({ ...prev, status: "captain_requested" })); setCaptainStep("request"); }} variant={online ? "secondary" : "primary"} className="mt-4 w-full">{online ? "Stay online" : "Go Online"}</Button>
+              <Button onClick={toggleCaptainAvailability} variant={online ? "secondary" : "primary"} className="mt-4 w-full">{online ? "Go Offline" : "Show demo ride request"}</Button>
             </div>
             <div className="mt-5 grid grid-cols-2 gap-3">
               {[
-                { label: "Today’s earnings", value: "₹640" },
-                { label: "Rides", value: "8" },
-                { label: "Online", value: "4h 12m" },
-                { label: "Rating", value: "4.9 ⭐" },
+                { label: "Sample earnings", value: "₹640" },
+                { label: "Sample rides", value: "8" },
+                { label: "Sample online time", value: "4h 12m" },
+                { label: "Sample rating", value: "4.9 ⭐" },
               ].map((item) => (
                 <div key={item.label} className="rounded-[22px] border border-[#f0dfe7] bg-white p-3 shadow-sm">
                   <div className="text-xs text-[#786f74]">{item.label}</div>
@@ -1023,7 +1327,7 @@ function PinkRideStage2() {
                 </div>
               ))}
             </div>
-            <div className="mt-5 h-[220px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" routeProgress={25} /></div>
+            <div className="mt-5 h-[180px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" routeProgress={25} /></div>
           </div>
         </div>
       );
@@ -1034,13 +1338,14 @@ function PinkRideStage2() {
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
           <div className="h-[430px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="finding" routeProgress={55} /></div>
           <div className="-mt-4 rounded-[30px] border border-[#f0dfe7] bg-white p-4 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
-            <div className="mb-3 flex items-center justify-between"><h2 className="text-[22px] font-bold tracking-[-0.05em] text-[#1d1b1f]">New PinkRide</h2><span className="rounded-full bg-[#fdf3f7] px-2 py-1 text-xs font-medium text-[#a6437a]">15s</span></div>
+            <div className="mb-3 flex items-center justify-between"><h2 className="text-[22px] font-bold tracking-[-0.05em] text-[#1d1b1f]">Sample ride request</h2><span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900">DEMO</span></div>
             <div className="rounded-[22px] bg-[#fff7fa] p-3 text-sm text-[#5c565c]">
-              <div className="flex justify-between"><span>Passenger</span><span className="font-medium text-[#1f1f22]">Priya Sharma</span></div>
-              <div className="mt-2 flex justify-between"><span>Rating</span><span className="font-medium text-[#1f1f22]">4.8 ⭐</span></div>
-              <div className="mt-2 flex justify-between"><span>Pickup</span><span className="font-medium text-[#1f1f22]">1.2 km away</span></div>
-              <div className="mt-2 flex justify-between"><span>Destination</span><span className="font-medium text-[#1f1f22]">Vesu, Surat</span></div>
-              <div className="mt-2 flex justify-between"><span>Est. earnings</span><span className="font-medium text-[#1f1f22]">₹72</span></div>
+              <div className="flex justify-between"><span>Passenger</span><span className="font-medium text-[#1f1f22]">{ride.passenger}</span></div>
+              <div className="mt-2 flex justify-between"><span>Rating</span><span className="font-medium text-[#1f1f22]">Sample only</span></div>
+              <div className="mt-2 flex justify-between"><span>Ride type</span><span className="font-medium text-[#1f1f22]">{getRideVehicleLabel(ride.vehicleType)}</span></div>
+              <div className="mt-2 flex justify-between"><span>Pickup</span><span className="font-medium text-[#1f1f22]">{ride.pickup}</span></div>
+              <div className="mt-2 flex justify-between"><span>Destination</span><span className="font-medium text-[#1f1f22]">{ride.destination}</span></div>
+              <div className="mt-2 flex justify-between"><span>Est. earnings</span><span className="font-medium text-[#1f1f22]">₹{ride.captainEarnings}</span></div>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <Button variant="secondary" onClick={captainDeclineRide}>Decline</Button>
@@ -1056,12 +1361,8 @@ function PinkRideStage2() {
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
           <div className="h-[440px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" routeProgress={72} /></div>
           <div className="-mt-4 rounded-[30px] border border-[#f0dfe7] bg-white p-4 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
-            <div className="flex items-center justify-between"><div><p className="text-sm text-[#6b666a]">Pickup in 3 min</p><h2 className="text-[22px] font-bold tracking-[-0.04em] text-[#221d20]">Priya Sharma</h2></div><span className="rounded-full bg-[#f3edf0] px-2 py-1 text-xs font-medium text-[#a6437a]">1.2 km</span></div>
-            <div className="mt-4 grid grid-cols-4 gap-2">
-              {['Call', 'Chat', 'Safety', 'Navigation'].map((action) => (
-                <button key={action} className="rounded-2xl border border-[#f0dfe7] bg-[#fffafd] p-3 text-center text-[11px] font-medium text-[#2f2d31]">{action}</button>
-              ))}
-            </div>
+            <div className="flex items-center justify-between"><div><p className="text-sm text-[#6b666a]">Pickup in 3 min</p><h2 className="text-[22px] font-bold tracking-[-0.04em] text-[#221d20]">{ride.passenger}</h2></div><span className="rounded-full bg-[#f3edf0] px-2 py-1 text-xs font-medium text-[#a6437a]">1.2 km</span></div>
+            <p className="mt-4 rounded-2xl bg-amber-50 p-3 text-xs leading-5 text-amber-950">Calls, chat, real navigation and safety support are not connected in this demo.</p>
             <Button onClick={captainArrived} className="mt-4 w-full">Arrived at pickup</Button>
           </div>
         </div>
@@ -1074,8 +1375,8 @@ function PinkRideStage2() {
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
             <h2 className="text-[28px] font-bold tracking-[-0.06em] text-[#211d20]">You&apos;re at the pickup</h2>
             <div className="mt-5 rounded-[24px] bg-[#fff7fa] p-4 text-sm text-[#5f5a60]">
-              <div className="flex justify-between"><span>Passenger</span><span className="font-medium text-[#1f1f22]">Priya Sharma</span></div>
-              <div className="mt-2 flex justify-between"><span>Pickup</span><span className="font-medium text-[#1f1f22]">Current Location</span></div>
+              <div className="flex justify-between"><span>Passenger</span><span className="font-medium text-[#1f1f22]">{ride.passenger}</span></div>
+              <div className="mt-2 flex justify-between"><span>Pickup</span><span className="font-medium text-[#1f1f22]">{ride.pickup}</span></div>
             </div>
             <div className="mt-5 rounded-2xl border border-[#f0dfe7] bg-[#fffdfd] p-3 text-sm text-[#605d63]">Confirm passenger details before starting.</div>
             <Button onClick={() => { setRide((prev) => ({ ...prev, status: "awaiting_pin" })); setCaptainStep("pin"); }} className="mt-6 w-full">Passenger is here</Button>
@@ -1103,13 +1404,9 @@ function PinkRideStage2() {
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
           <div className="h-[520px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" routeProgress={86} /></div>
           <div className="-mt-4 rounded-[30px] border border-[#f0dfe7] bg-white p-4 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
-            <div className="flex items-center justify-between"><div><p className="text-sm text-[#6b666a]">Ride in progress</p><h2 className="text-[22px] font-bold tracking-[-0.04em] text-[#221d20]">Priya Sharma</h2></div><span className="rounded-full bg-[#f3edf0] px-2 py-1 text-xs font-medium text-[#a6437a]">ETA 12 min</span></div>
-            <div className="mt-3 text-sm text-[#5e575d]">Destination: Vesu, Surat</div>
-            <div className="mt-4 grid grid-cols-4 gap-2">
-              {['Call', 'Chat', 'Safety', 'Cancel'].map((action) => (
-                <button key={action} className="rounded-2xl border border-[#f0dfe7] bg-[#fffafd] p-3 text-center text-[11px] font-medium text-[#2f2d31]">{action}</button>
-              ))}
-            </div>
+            <div className="flex items-center justify-between"><div><p className="text-sm text-[#6b666a]">Ride in progress</p><h2 className="text-[22px] font-bold tracking-[-0.04em] text-[#221d20]">{ride.passenger}</h2></div><span className="rounded-full bg-[#f3edf0] px-2 py-1 text-xs font-medium text-[#a6437a]">ETA 12 min</span></div>
+            <div className="mt-3 text-sm text-[#5e575d]">Destination: {ride.destination}</div>
+            <p className="mt-4 rounded-2xl bg-amber-50 p-3 text-xs leading-5 text-amber-950">Calls, chat, cancellation and safety support are not connected in this demo.</p>
             <Button onClick={completeRide} className="mt-4 w-full">Complete Ride</Button>
           </div>
         </div>
@@ -1121,11 +1418,11 @@ function PinkRideStage2() {
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-8">
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-5 shadow-[0_18px_35px_rgba(132,92,120,0.08)] text-center">
             <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_20%,#f6dbe9,#d98ca9_28%,#a6437a_85%)] text-3xl shadow-md">₹</div>
-            <h2 className="text-[28px] font-bold tracking-[-0.06em] text-[#201d20]">₹72 earned</h2>
-            <p className="mt-2 text-sm text-[#655f63]">Today&apos;s earnings updated.</p>
+            <h2 className="text-[28px] font-bold tracking-[-0.06em] text-[#201d20]">₹{ride.captainEarnings} earned</h2>
+            <p className="mt-2 text-sm text-[#655f63]">Demo summary only. No real earnings are recorded.</p>
             <div className="mt-6 rounded-[24px] bg-[#fff7fa] p-4 text-sm text-[#5c5a5d]">
-              <div className="flex justify-between"><span>Today&apos;s earnings</span><span className="font-semibold text-[#1f1f22]">₹712</span></div>
-              <div className="mt-2 flex justify-between"><span>Today&apos;s rides</span><span className="font-semibold text-[#1f1f22]">9</span></div>
+              <div className="flex justify-between"><span>Sample earnings</span><span className="font-semibold text-[#1f1f22]">₹712</span></div>
+              <div className="mt-2 flex justify-between"><span>Sample completed rides</span><span className="font-semibold text-[#1f1f22]">9</span></div>
             </div>
             <Button onClick={() => setCaptainStep("home")} className="mt-6 w-full">Back to Home</Button>
           </div>
@@ -1139,24 +1436,75 @@ function PinkRideStage2() {
   return (
     <div className="min-h-screen bg-[#fff9fb] text-[#1d1b1f]">
       <div className="mx-auto max-w-[1100px] px-2 py-4">
-        <div className="mb-3 flex justify-center">
+        <div className="mb-3 flex items-center justify-between">
+          {canGoBack ? (
+            <button
+              type="button"
+              onClick={goBack}
+              aria-label="Go back to previous screen"
+              className="inline-flex items-center gap-1 rounded-full border border-[#f1dfe8] bg-white px-3 py-2 text-sm font-semibold text-[#5d5a5f] shadow-sm transition hover:bg-[#fff4f8] focus:outline-none focus:ring-2 focus:ring-[#d089aa] focus:ring-offset-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+          ) : (
+            <span className="w-[68px]" aria-hidden="true" />
+          )}
           <div className="inline-flex rounded-full border border-[#f1dfe8] bg-white p-1 shadow-sm">
             <button onClick={() => setRole("passenger")} className={cn("rounded-full px-4 py-2 text-sm font-semibold", role === "passenger" ? "bg-[#a6437a] text-white" : "text-[#5d5a5f]")}>Passenger</button>
-            <button onClick={() => setRole("captain")} className={cn("rounded-full px-4 py-2 text-sm font-semibold", role === "captain" ? "bg-[#a6437a] text-white" : "text-[#5d5a5f]")}>Captain</button>
+            <button onClick={() => setRole("captain")} className={cn("rounded-full px-4 py-2 text-sm font-semibold", role === "captain" ? "bg-[#a6437a] text-white" : "text-[#5d5a5f]")}>Captain / Driver</button>
           </div>
+          {loggedInRoles[role] ? (
+            <button
+              type="button"
+              onClick={() => setLogoutOpen(true)}
+              className="inline-flex items-center gap-1 rounded-full border border-[#f1dfe8] bg-white px-3 py-2 text-sm font-semibold text-[#5d5a5f] shadow-sm transition hover:bg-[#fff4f8] focus:outline-none focus:ring-2 focus:ring-[#d089aa] focus:ring-offset-2"
+            >
+              <LogOut className="h-4 w-4" />
+              Log out
+            </button>
+          ) : (
+            <span className="w-[68px]" aria-hidden="true" />
+          )}
+        </div>
+        <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
+          <strong>Demo preview.</strong> OTP/PIN: 4821. Sample maps and fares only; no real ride dispatch, emergency response, identity checks, or payments.
         </div>
         {role === "passenger" ? renderPassengerFlow() : renderCaptainFlow()}
+        <footer className="mx-auto mt-4 flex max-w-md justify-center gap-4 pb-6 text-xs text-[#706b71]">
+          <Link href="/legal" className="underline underline-offset-2">Policies (draft)</Link>
+          <span>Demo only · Do not use for real trips</span>
+        </footer>
       </div>
 
       {sosOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1d1a1f]/50 px-4 pb-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md rounded-[30px] bg-white p-5 shadow-[0_20px_50px_rgba(15,15,18,0.28)]">
-            <h3 className="text-[24px] font-bold tracking-[-0.05em] text-[#1f1f22]">Are you sure you need emergency assistance?</h3>
+            <h3 className="text-[24px] font-bold tracking-[-0.05em] text-[#1f1f22]">Emergency help</h3>
+            <p className="mt-2 text-sm leading-6 text-[#655f63]">PinkRide cannot contact emergency services or share your location in this demo. If you are in immediate danger in India, call 112.</p>
             <div className="mt-5 grid grid-cols-2 gap-3">
               <Button variant="secondary" onClick={() => setSosOpen(false)}>Cancel</Button>
-              <Button onClick={() => { setSosOpen(false); setToast("Emergency assistance activated"); }}>Get help</Button>
+              <a href="tel:112" onClick={() => setSosOpen(false)} className="inline-flex items-center justify-center rounded-full bg-[#a6437a] px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(166,67,122,0.28)]">Call 112</a>
             </div>
           </motion.div>
+        </div>
+      )}
+
+      {logoutOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1d1a1f]/50 px-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="logout-title"
+            className="w-full max-w-sm rounded-[28px] bg-white p-5 shadow-[0_20px_50px_rgba(15,15,18,0.28)]"
+          >
+            <h2 id="logout-title" className="text-xl font-bold text-[#1f1f22]">Log out of PinkRide?</h2>
+            <p className="mt-2 text-sm text-[#655f63]">Your account stays saved on this browser. You can sign back in with your phone number.</p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <Button variant="secondary" onClick={() => setLogoutOpen(false)}>Stay logged in</Button>
+              <Button onClick={logout}>Log out</Button>
+            </div>
+          </div>
         </div>
       )}
 

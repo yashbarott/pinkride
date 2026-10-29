@@ -15,6 +15,9 @@ export default async function AdminDashboardPage() {
         <header className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8a7d85]">PinkRide</p>
           <h1 className="mt-2 text-4xl font-bold tracking-[-0.06em]">Admin dashboard</h1>
+          <p className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+            Demo dashboard. These are sample figures, not live passenger, captain, ride, revenue, or safety data.
+          </p>
         </header>
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -41,7 +44,7 @@ export default async function AdminDashboardPage() {
             <div key={label} className="rounded-[24px] border border-[#f0dfe7] bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[#6d6971]">{label}</span>
-                <span className="rounded-full bg-[#fff3f8] px-2 py-1 text-xs font-medium text-[#a6437a]">Live</span>
+                <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900">Sample</span>
               </div>
               <p className="mt-4 text-2xl font-bold tracking-[-0.05em]">{value}</p>
             </div>

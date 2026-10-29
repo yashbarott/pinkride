@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "PinkRide | Safe rides. By women. For women.",
-  description: "Premium women-only bike ride booking prototype.",
+  description: "PinkRide demo prototype for women-focused bike, rickshaw, and car ride booking.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

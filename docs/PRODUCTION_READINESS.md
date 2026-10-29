@@ -4,7 +4,7 @@ This is an evidence-based baseline for the repository as inspected. `READY` mean
 
 | Area | Status | Implementation | Remaining work | Testing status | Notes |
 |---|---|---|---|---|---|
-| Authentication | BLOCKED | Fixed OTP and demo identities; production demo APIs fail closed. | Integrate OTP provider, expiry/attempt limits, secure sessions, refresh, logout, recovery, deletion, suspension. | Build only; no auth tests. | Do not accept real users. |
+| Authentication | BLOCKED | Fixed demo OTP, browser-local signup/sign-in, and in-app logout; production demo APIs fail closed. | Integrate a real OTP provider, expiry/attempt limits, secure sessions, refresh, account recovery, deletion, and suspension. | Build and browser demo-flow checks; no provider integration tests. | Browser-local accounts are not production authentication. Do not accept real users. |
 | Authorization | BLOCKED | No verified session/role middleware or server-side role checks. | Enforce passenger/captain/admin/support permissions in every handler. | Not tested. | UI hiding is not authorization. |
 | Database | BLOCKED | Types and setup notes only. | Migrations, constraints, transactions, backups, indexes, database adapter. | Not tested. | No schema found. |
 | Realtime | BLOCKED | No production subscription/recovery path found. | Reconnect, resubscribe, deduplicate and fetch authoritative state after reconnect. | Not tested. | No Supabase Realtime configured. |
