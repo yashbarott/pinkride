@@ -26,6 +26,7 @@ type PassengerStep =
   | "profile"
   | "permissions"
   | "home"
+  | "places"
   | "search"
   | "pickup"
   | "ride-options"
@@ -114,6 +115,31 @@ type RideHistoryEntry = {
   destination: string;
   fare: number;
 };
+
+type SavedPlaces = {
+  home: string;
+  work: string;
+};
+
+const emptySavedPlaces: SavedPlaces = { home: "", work: "" };
+
+function parseSavedPlaces(value: string | null): SavedPlaces {
+  if (!value) return emptySavedPlaces;
+
+  const parsed: unknown = JSON.parse(value);
+  if (
+    typeof parsed !== "object"
+    || parsed === null
+    || !("home" in parsed)
+    || typeof parsed.home !== "string"
+    || !("work" in parsed)
+    || typeof parsed.work !== "string"
+  ) {
+    throw new Error("Saved places must contain Home and Work addresses.");
+  }
+
+  return { home: parsed.home, work: parsed.work };
+}
 
 function parseRideHistory(value: string | null): RideHistoryEntry[] {
   if (!value) return [];
@@ -251,49 +277,44 @@ function OTPInput({
 
 function MapView({
   mode = "home",
-  routeProgress = 30,
 }: {
   mode?: "home" | "route" | "finding";
-  routeProgress?: number;
 }) {
+  const mapLabels = {
+    home: "Vesu, Surat · demo map",
+    route: "Map preview · not a live route",
+    finding: "Map preview · no live tracking",
+  };
+
   return (
-    <div role="img" aria-label="Illustrative map preview. Live GPS is not connected." className="relative h-full w-full overflow-hidden rounded-[28px] bg-[#edf2f4]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.85),transparent_20%),linear-gradient(135deg,#edf0f4,#e8ecef_48%,#dfe7eb)]" />
-      <div className="absolute inset-0 opacity-80 [background-image:linear-gradient(rgba(135,150,160,0.3)_1px,transparent_1px),linear-gradient(90deg,rgba(135,150,160,0.3)_1px,transparent_1px)] [background-size:30px_30px]" />
-
-      <div className="absolute left-[18%] top-[20%] h-16 w-32 rotate-12 rounded-full border border-[#c1bec8]/70 bg-white/12" />
-      <div className="absolute right-[20%] top-[28%] h-14 w-28 -rotate-12 rounded-full border border-[#c1bec8]/70 bg-white/14" />
-      <div className="absolute left-[22%] bottom-[26%] h-28 w-40 rotate-6 rounded-full border border-[#c1bec8]/70 bg-white/12" />
-
-      <div className="absolute left-[27%] top-[30%] h-[1px] w-[48%] bg-[#adb7bb]/70" />
-      <div className="absolute left-[15%] bottom-[38%] h-[1px] w-[55%] rotate-[-18deg] bg-[#adb7bb]/70" />
-      <div className="absolute right-[14%] top-[38%] h-[1px] w-[26%] rotate-[16deg] bg-[#adb7bb]/70" />
-
-      <div className="absolute left-[24%] top-[54%] h-3 w-3 rounded-full bg-[#a6437a] shadow-[0_0_0_8px_rgba(166,67,122,0.15)]" />
-      <div className="absolute right-[18%] bottom-[25%] h-3 w-3 rounded-full bg-[#5d1f4d] shadow-[0_0_0_8px_rgba(93,31,77,0.2)]" />
-      <div className="absolute left-[50%] top-[46%] h-4 w-4 rounded-full bg-[#a6437a] shadow-[0_0_0_10px_rgba(166,67,122,0.15)]" />
-
-      {mode !== "home" && (
-        <div className="absolute inset-x-[16%] top-[30%] h-[2px] rounded-full bg-gradient-to-r from-[#a6437a] via-[#8d3f8a] to-[#5d1f4d] shadow-[0_0_18px_rgba(166,67,122,0.6)]">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-transparent via-[#f7d0df] to-transparent"
-            style={{ width: `${routeProgress}%` }}
-          />
-        </div>
-      )}
-
-      {mode === "finding" && (
-        <motion.div
-          animate={{ scale: [1, 1.8, 1], opacity: [0.6, 0, 0.4] }}
-          transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut" }}
-          className="absolute left-[24%] top-[55%] flex h-20 w-20 items-center justify-center rounded-full border border-[#a6437a]/40"
+    <div
+      role="region"
+      aria-label="Interactive map preview centered on Vesu, Surat"
+      className="relative h-full w-full overflow-hidden rounded-[28px] bg-[#e8eee8]"
+    >
+      <iframe
+        title="Interactive OpenStreetMap centered on Vesu, Surat"
+        src="https://www.openstreetmap.org/export/embed.html?bbox=72.740%2C21.118%2C72.813%2C21.170&layer=mapnik&marker=21.1458%2C72.7701#map=15/21.1458/72.7701"
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        className="absolute inset-0 h-full w-full border-0"
+      />
+      <div className="pointer-events-none absolute left-3 top-3 rounded-full border border-white/80 bg-white/95 px-3 py-1.5 text-xs font-semibold text-[#39343a] shadow-md">
+        {mapLabels[mode]}
+      </div>
+      <div className="absolute bottom-2 left-2 rounded-full border border-white/80 bg-white/95 px-2.5 py-1 text-[10px] font-medium text-[#514a50] shadow-sm">
+        Demo location · no live GPS
+      </div>
+      <div className="absolute bottom-2 right-2 rounded bg-white/95 px-1.5 py-1 text-[10px] text-[#514a50] shadow-sm">
+        ©{" "}
+        <a
+          href="https://www.openstreetmap.org/copyright"
+          target="_blank"
+          rel="noreferrer"
+          className="font-medium underline underline-offset-2"
         >
-          <div className="h-5 w-5 rounded-full bg-[#a6437a]" />
-        </motion.div>
-      )}
-
-      <div className="absolute left-3 top-3 rounded-full border border-white/70 bg-white/90 px-3 py-1.5 text-xs font-medium text-[#514a50] shadow-sm">
-        Illustrative map · no live GPS
+          OpenStreetMap contributors
+        </a>
       </div>
     </div>
   );
@@ -325,6 +346,7 @@ function PinkRideStage2() {
   const [captainName, setCaptainName] = useState("");
   const [captainEmail, setCaptainEmail] = useState("");
   const [passengerAccountPhone, setPassengerAccountPhone] = useState("");
+  const [savedPlaces, setSavedPlaces] = useState<SavedPlaces>(emptySavedPlaces);
   const [passengerRideHistory, setPassengerRideHistory] = useState<RideHistoryEntry[]>([]);
   const [otp, setOtp] = useState("");
   const [captainOtp, setCaptainOtp] = useState("");
@@ -436,6 +458,18 @@ function PinkRideStage2() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  const loadPassengerPlaces = (passengerPhone: string) => {
+    try {
+      const saved = parseSavedPlaces(
+        window.localStorage.getItem(`pinkride:saved-places:${passengerPhone}`),
+      );
+      setSavedPlaces(saved);
+    } catch {
+      setSavedPlaces(emptySavedPlaces);
+      setToast("Could not load saved places. Check browser storage and try again.");
+    }
+  };
+
   const saveDemoAccount = (accountRole: Role, name: string, email: string) => {
     const cleanedPhone = phone.replace(/\D/g, "");
     if (!/^\d{10}$/.test(cleanedPhone)) {
@@ -470,7 +504,9 @@ function PinkRideStage2() {
 
   const createPassengerAccount = () => {
     if (!saveDemoAccount("passenger", passengerName, passengerEmail)) return;
-    setPassengerAccountPhone(phone.replace(/\D/g, ""));
+    const passengerPhone = phone.replace(/\D/g, "");
+    setPassengerAccountPhone(passengerPhone);
+    loadPassengerPlaces(passengerPhone);
     setLoggedInRoles((previous) => ({ ...previous, passenger: true }));
     setPassengerStep("permissions");
     setToast("Passenger account created");
@@ -518,6 +554,7 @@ function PinkRideStage2() {
         setPassengerName(account.name);
         setPassengerEmail(account.email);
         setPassengerAccountPhone(account.phone);
+        loadPassengerPlaces(account.phone);
         setLoggedInRoles((previous) => ({ ...previous, passenger: true }));
         setPassengerStep("home");
       } else {
@@ -541,6 +578,7 @@ function PinkRideStage2() {
       setPassengerName("");
       setPassengerEmail("");
       setPassengerAccountPhone("");
+      setSavedPlaces(emptySavedPlaces);
       setOtp("");
       setPassengerStep("login");
     } else {
@@ -569,6 +607,36 @@ function PinkRideStage2() {
       setToast("Could not load your ride history. Check browser storage and try again.");
     }
     setPassengerStep("history");
+  };
+
+  const savePassengerPlaces = () => {
+    const passengerPhone = passengerAccountPhone || phone.replace(/\D/g, "");
+    if (!passengerPhone) {
+      setToast("Sign in to save your places.");
+      return;
+    }
+
+    const places = {
+      home: savedPlaces.home.trim(),
+      work: savedPlaces.work.trim(),
+    };
+
+    try {
+      window.localStorage.setItem(
+        `pinkride:saved-places:${passengerPhone}`,
+        JSON.stringify(places),
+      );
+      setSavedPlaces(places);
+      setToast("Saved places updated");
+      setPassengerStep("home");
+    } catch {
+      setToast("Could not save your places. Check browser storage and try again.");
+    }
+  };
+
+  const selectSavedPlace = (address: string) => {
+    setRide((previous) => ({ ...previous, destination: address }));
+    setPassengerStep("pickup");
   };
 
   const captainAcceptRide = () => {
@@ -823,6 +891,11 @@ function PinkRideStage2() {
     }
 
     if (currentPassengerStep === "home") {
+      const savedPlaceShortcuts = [
+        { label: "Home", address: savedPlaces.home, icon: MapPin },
+        { label: "Work", address: savedPlaces.work, icon: BriefcaseBusiness },
+      ].filter((place) => place.address);
+
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] pb-24 pt-6">
           <header className="mb-4 flex items-center justify-between px-4">
@@ -861,6 +934,96 @@ function PinkRideStage2() {
               </button>
             ))}
           </div>
+          <section className="mx-4 mt-5 rounded-[24px] border border-[#f0dfe7] bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-[#1f1f22]">Saved places</h2>
+                <p className="mt-1 text-xs text-[#716b70]">Book your regular destinations faster.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPassengerStep("places")}
+                className="shrink-0 rounded-full bg-[#fff4f8] px-3 py-2 text-xs font-semibold text-[#a6437a]"
+              >
+                Manage
+              </button>
+            </div>
+            {savedPlaceShortcuts.length > 0 ? (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {savedPlaceShortcuts.map((place) => (
+                  <button
+                    key={place.label}
+                    type="button"
+                    onClick={() => selectSavedPlace(place.address)}
+                    className="flex min-w-0 items-center gap-2 rounded-2xl border border-[#f1e5eb] p-3 text-left transition hover:bg-[#fff8fb]"
+                  >
+                    <place.icon className="h-4 w-4 shrink-0 text-[#a6437a]" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-[#1f1f22]">{place.label}</span>
+                      <span className="block truncate text-xs text-[#716b70]">{place.address}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setPassengerStep("places")}
+                className="mt-3 w-full rounded-2xl border border-dashed border-[#e7cbd9] px-3 py-3 text-left text-sm font-medium text-[#a6437a]"
+              >
+                Add your Home or Work address
+              </button>
+            )}
+          </section>
+        </div>
+      );
+    }
+
+    if (currentPassengerStep === "places") {
+      return (
+        <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-5">
+          <div className="mb-5 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setPassengerStep("home")}
+              aria-label="Back to home"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm"
+            >
+              <ArrowLeft className="h-4 w-4 text-[#2b2a2d]" />
+            </button>
+            <div>
+              <h2 className="text-[24px] font-bold tracking-[-0.05em] text-[#211d20]">Saved places</h2>
+              <p className="text-sm text-[#706b71]">Keep regular destinations ready to book.</p>
+            </div>
+          </div>
+          <div className="space-y-4 rounded-[28px] border border-[#f0dfe7] bg-white p-4 shadow-sm">
+            <div>
+              <label htmlFor="saved-home" className="mb-2 block text-sm font-semibold text-[#4c474d]">Home</label>
+              <input
+                id="saved-home"
+                autoComplete="street-address"
+                maxLength={100}
+                placeholder="Add your home address"
+                value={savedPlaces.home}
+                onChange={(event) => setSavedPlaces((previous) => ({ ...previous, home: event.target.value }))}
+                className="w-full rounded-2xl border border-[#ebd9e3] bg-[#fffdfd] px-4 py-3 text-[15px] text-[#1f1f22] outline-none focus:border-[#b85587]"
+              />
+            </div>
+            <div>
+              <label htmlFor="saved-work" className="mb-2 block text-sm font-semibold text-[#4c474d]">Work</label>
+              <input
+                id="saved-work"
+                autoComplete="street-address"
+                maxLength={100}
+                placeholder="Add your work address"
+                value={savedPlaces.work}
+                onChange={(event) => setSavedPlaces((previous) => ({ ...previous, work: event.target.value }))}
+                className="w-full rounded-2xl border border-[#ebd9e3] bg-[#fffdfd] px-4 py-3 text-[15px] text-[#1f1f22] outline-none focus:border-[#b85587]"
+              />
+            </div>
+            <p className="text-xs leading-5 text-[#716b70]">Addresses are saved only in this browser for your passenger account.</p>
+            <Button onClick={savePassengerPlaces} className="w-full">Save places</Button>
+          </div>
         </div>
       );
     }
@@ -890,7 +1053,7 @@ function PinkRideStage2() {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
           <div className="h-[480px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_40px_rgba(26,17,22,0.08)]">
-            <MapView mode="route" routeProgress={70} />
+            <MapView mode="route" />
           </div>
           <div className="-mt-4 rounded-[30px] border border-[#f0dfe7] bg-white p-4 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
             <h2 className="text-[24px] font-bold tracking-[-0.05em] text-[#211d20]">Confirm pickup</h2>
@@ -918,7 +1081,7 @@ function PinkRideStage2() {
 
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
-          <div className="mb-4 h-[280px] overflow-hidden rounded-[28px] border border-[#f1dfe8] bg-white p-2 shadow-sm"><MapView mode="route" routeProgress={50} /></div>
+          <div className="mb-4 h-[280px] overflow-hidden rounded-[28px] border border-[#f1dfe8] bg-white p-2 shadow-sm"><MapView mode="route" /></div>
           <div className="rounded-[30px] border border-[#f0dfe7] bg-white p-4 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
             <h2 className="mb-4 text-[24px] font-bold tracking-[-0.05em] text-[#211d20]">Choose your ride</h2>
             <div className="space-y-3">
@@ -983,7 +1146,7 @@ function PinkRideStage2() {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pt-3">
           <div className="h-[560px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]">
-            <MapView mode="finding" routeProgress={40} />
+            <MapView mode="finding" />
           </div>
           <div className="-mt-12 mx-auto max-w-[310px] rounded-[28px] border border-[#f0dde7] bg-white p-4 text-center shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
             <div className="mb-4 flex items-center justify-center gap-3"><div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-[#f8edf3] text-[#a6437a]"><motion.div animate={{ scale: [1, 1.6, 1], opacity: [0.7, 0, 0.7] }} transition={{ duration: 1.8, repeat: Infinity }} className="absolute inset-0 rounded-full border border-[#a6437a]/50" /><MapPin className="h-5 w-5" /></div></div>
@@ -997,7 +1160,7 @@ function PinkRideStage2() {
     if (currentPassengerStep === "captain-assigned") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
-          <div className="h-[420px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" routeProgress={66} /></div>
+          <div className="h-[420px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" /></div>
           <div className="-mt-4 rounded-[30px] border border-[#f0dfe7] bg-white p-4 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
             <h2 className="text-[24px] font-bold tracking-[-0.05em] text-[#1f1f22]">Sample captain assigned</h2>
             <div className="mt-4 flex items-center gap-3 rounded-2xl bg-[#fff7fa] p-3">
@@ -1053,7 +1216,7 @@ function PinkRideStage2() {
     if (currentPassengerStep === "ride-active") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
-          <div className="h-[520px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" routeProgress={84} /></div>
+          <div className="h-[520px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" /></div>
           <div className="-mt-4 rounded-[30px] border border-[#f0dfe7] bg-white p-4 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
             <div className="flex items-center justify-between">
               <div><p className="text-sm text-[#6b666a]">Demo ride in progress</p><h2 className="text-[22px] font-bold tracking-[-0.04em] text-[#221d20]">{ride.captain}</h2></div>
@@ -1327,7 +1490,7 @@ function PinkRideStage2() {
                 </div>
               ))}
             </div>
-            <div className="mt-5 h-[180px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" routeProgress={25} /></div>
+            <div className="mt-5 h-[180px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" /></div>
           </div>
         </div>
       );
@@ -1336,7 +1499,7 @@ function PinkRideStage2() {
     if (currentCaptainStep === "request") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
-          <div className="h-[430px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="finding" routeProgress={55} /></div>
+          <div className="h-[430px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="finding" /></div>
           <div className="-mt-4 rounded-[30px] border border-[#f0dfe7] bg-white p-4 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
             <div className="mb-3 flex items-center justify-between"><h2 className="text-[22px] font-bold tracking-[-0.05em] text-[#1d1b1f]">Sample ride request</h2><span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900">DEMO</span></div>
             <div className="rounded-[22px] bg-[#fff7fa] p-3 text-sm text-[#5c565c]">
@@ -1359,7 +1522,7 @@ function PinkRideStage2() {
     if (currentCaptainStep === "navigate") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
-          <div className="h-[440px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" routeProgress={72} /></div>
+          <div className="h-[440px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" /></div>
           <div className="-mt-4 rounded-[30px] border border-[#f0dfe7] bg-white p-4 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
             <div className="flex items-center justify-between"><div><p className="text-sm text-[#6b666a]">Pickup in 3 min</p><h2 className="text-[22px] font-bold tracking-[-0.04em] text-[#221d20]">{ride.passenger}</h2></div><span className="rounded-full bg-[#f3edf0] px-2 py-1 text-xs font-medium text-[#a6437a]">1.2 km</span></div>
             <p className="mt-4 rounded-2xl bg-amber-50 p-3 text-xs leading-5 text-amber-950">Calls, chat, real navigation and safety support are not connected in this demo.</p>
@@ -1402,7 +1565,7 @@ function PinkRideStage2() {
     if (currentCaptainStep === "active") {
       return (
         <div className="mx-auto min-h-screen max-w-md bg-[#fffafc] px-4 pb-24 pt-4">
-          <div className="h-[520px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" routeProgress={86} /></div>
+          <div className="h-[520px] overflow-hidden rounded-[30px] border border-[#f1dfe8] bg-white p-2 shadow-[0_20px_35px_rgba(26,17,22,0.08)]"><MapView mode="route" /></div>
           <div className="-mt-4 rounded-[30px] border border-[#f0dfe7] bg-white p-4 shadow-[0_18px_35px_rgba(132,92,120,0.08)]">
             <div className="flex items-center justify-between"><div><p className="text-sm text-[#6b666a]">Ride in progress</p><h2 className="text-[22px] font-bold tracking-[-0.04em] text-[#221d20]">{ride.passenger}</h2></div><span className="rounded-full bg-[#f3edf0] px-2 py-1 text-xs font-medium text-[#a6437a]">ETA 12 min</span></div>
             <div className="mt-3 text-sm text-[#5e575d]">Destination: {ride.destination}</div>
